@@ -1,0 +1,489 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Yoink</title>
+    <link
+      href="https://fonts.googleapis.com/css2?family=VT323&family=Pixelify+Sans:wght@400;600&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      html,
+      body {
+        margin: 0;
+      }
+      body {
+        font-family: "Pixelify Sans", Tahoma, sans-serif;
+        background: #ece9d8;
+      }
+      .tbar {
+        background: linear-gradient(180deg, #4a93f8 0%, #2566db 50%, #0f3fb5 100%);
+        color: #ffffff;
+        font-size: 13px;
+        padding: 6px 9px;
+        display: flex;
+        justify-content: space-between;
+      }
+      .mbar {
+        background: #ece9d8;
+        font-size: 13px;
+        padding: 3px 9px;
+        color: #1a3a6e;
+        display: flex;
+        gap: 14px;
+        align-items: center;
+        border-bottom: 1px solid #aca899;
+      }
+      .mbar u {
+        text-decoration: underline;
+      }
+      .sig {
+        margin-left: auto;
+        font-family: "VT323", monospace;
+        color: #5a7fc4;
+      }
+      .body {
+        background: #ffffff;
+        padding: 11px 12px 8px;
+      }
+      .canvas-wrap {
+        position: relative;
+        margin: 9px 0 6px;
+        background: #fff;
+        border: 2px inset #aca899;
+        border-radius: 3px;
+        height: 110px;
+        overflow: hidden;
+        touch-action: none;
+      }
+      #wave {
+        width: 100%;
+        height: 110px;
+        display: block;
+      }
+      .region {
+        position: absolute;
+        top: 0;
+        bottom: 0;
+        background: rgba(40, 110, 230, 0.18);
+        border-left: 3px solid #1648c4;
+        border-right: 3px solid #1648c4;
+      }
+      .handle {
+        position: absolute;
+        top: 50%;
+        width: 11px;
+        height: 30px;
+        margin-top: -15px;
+        background: #1648c4;
+        border-radius: 3px;
+        cursor: ew-resize;
+      }
+      .handle.l {
+        left: -7px;
+      }
+      .handle.r {
+        right: -7px;
+      }
+      .playhead {
+        position: absolute;
+        top: 0;
+        bottom: 0;
+        width: 2px;
+        background: #0a2a6a;
+        display: none;
+      }
+      .zoomhint {
+        font-family: "VT323", monospace;
+        font-size: 11px;
+        color: #5a7fc4;
+        text-align: center;
+        margin: 0 0 6px;
+      }
+      .meta {
+        font-family: "VT323", monospace;
+        font-size: 14px;
+        color: #3a5a8c;
+        display: flex;
+        justify-content: space-between;
+        margin: 0 2px 7px;
+      }
+      .ctrls {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        margin-bottom: 9px;
+      }
+      .play {
+        width: 30px;
+        height: 26px;
+        background: linear-gradient(180deg, #86d94e, #3e9c20);
+        color: #fff;
+        border: 1px solid #fff;
+        border-radius: 5px;
+        cursor: pointer;
+      }
+      .tg {
+        display: flex;
+        align-items: center;
+        gap: 4px;
+        font-size: 12px;
+        color: #1a3a6e;
+      }
+      .tin {
+        width: 58px;
+        background: #fff;
+        border: 2px inset #aca899;
+        border-radius: 3px;
+        height: 24px;
+        font-family: "VT323", monospace;
+        font-size: 15px;
+        text-align: center;
+        color: #103a8e;
+      }
+      .dur {
+        font-size: 12px;
+        color: #4a6fa5;
+        margin-left: auto;
+      }
+      .opts {
+        display: grid;
+        grid-template-columns: auto 1fr;
+        gap: 6px 8px;
+        font-size: 12px;
+        color: #1a3a6e;
+        align-items: center;
+        margin-bottom: 10px;
+      }
+      .opt-in,
+      select {
+        background: #fff;
+        border: 2px inset #aca899;
+        border-radius: 3px;
+        height: 24px;
+        font-family: "VT323", monospace;
+        font-size: 14px;
+        color: #103a8e;
+        padding: 0 6px;
+        box-sizing: border-box;
+        width: 100%;
+      }
+      .footer {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        background: #ece9d8;
+        padding: 8px 10px;
+        border-top: 1px solid #aca899;
+      }
+      .fsig {
+        font-family: "VT323", monospace;
+        font-size: 11px;
+        color: #5a7fc4;
+      }
+      .drop {
+        background: linear-gradient(180deg, #4a93f8, #1648c4);
+        color: #fff;
+        border: 1px solid #fff;
+        border-radius: 6px;
+        font-size: 14px;
+        padding: 7px 16px;
+        box-shadow: 2px 2px 0 rgba(20, 60, 160, 0.5);
+        cursor: pointer;
+        font-family: inherit;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="tbar"><span>Yoink youtube links ♡</span><span>_ ▢ ✕</span></div>
+    <div class="mbar">
+      <span><u>F</u>ile</span><span><u>E</u>dit</span><span><u>C</u>rate</span><span><u>H</u>elp</span
+      ><span class="sig">Developed by gudimbz ♡</span>
+    </div>
+    <div class="body">
+      <div class="canvas-wrap" id="wrap">
+        <canvas id="wave"></canvas>
+        <div class="region" id="region">
+          <div class="handle l" data-h="l"></div>
+          <div class="handle r" data-h="r"></div>
+        </div>
+        <div class="playhead" id="playhead"></div>
+      </div>
+      <div class="zoomhint">⊹ scroll to zoom · drag to pan · double-click to fit ⊹</div>
+      <div class="meta"><span id="title">__TITLE__</span><span id="totaldur"></span></div>
+      <div class="ctrls">
+        <button class="play" id="play">▶</button>
+        <div class="tg">start <input class="tin" id="start" /></div>
+        <div class="tg">end <input class="tin" id="end" /></div>
+        <span class="dur" id="seldur"></span>
+      </div>
+      <div class="opts">
+        <span>name</span><input class="opt-in" id="name" value="__NAME__" />
+        <span>drop on</span>
+        <select id="target">
+          <option value="selected">selected track</option>
+          <option value="new">new track</option>
+        </select>
+      </div>
+    </div>
+    <div class="footer">
+      <span class="fsig">made w ♡ by gudimbz</span>
+      <button class="drop" id="dropBtn">drop into set</button>
+    </div>
+
+    <audio id="audio" src="__AUDIO_SRC__"></audio>
+    <script>
+      const DURATION = Number("__DURATION__") || 0; // full video length in seconds
+      let startSec = Math.min(Number("__START_SEC__") || 0, DURATION);
+      let endSec = DURATION;
+
+      const wrap = document.getElementById("wrap");
+      const canvas = document.getElementById("wave");
+      const region = document.getElementById("region");
+      const playhead = document.getElementById("playhead");
+      const audio = document.getElementById("audio");
+      const startIn = document.getElementById("start");
+      const endIn = document.getElementById("end");
+
+      // ---- view window (zoom / pan) ----
+      let viewStart = 0,
+        viewEnd = DURATION || 1;
+      let audioBuffer = null;
+      const MIN_SPAN = 0.05; // seconds — the deepest zoom level
+      const span = () => viewEnd - viewStart;
+      const timeToX = (t) => ((t - viewStart) / span()) * wrap.clientWidth;
+      const xToTime = (x) => viewStart + (x / wrap.clientWidth) * span();
+
+      function clock(s) {
+        s = Math.max(0, Math.floor(s));
+        const h = Math.floor(s / 3600),
+          m = Math.floor((s % 3600) / 60),
+          x = s % 60;
+        const p = (n) => String(n).padStart(2, "0");
+        return h > 0 ? h + ":" + p(m) + ":" + p(x) : m + ":" + p(x);
+      }
+      function parseClock(v) {
+        const parts = v.trim().split(":");
+        if (parts.length < 2 || parts.length > 3 || !parts.every((p) => /^\d+$/.test(p))) return null;
+        const n = parts.map(Number);
+        return parts.length === 3 ? n[0] * 3600 + n[1] * 60 + n[2] : n[0] * 60 + n[1];
+      }
+
+      // ---- waveform ----
+      function computePeaks(buffer, fromSec, toSec, cols) {
+        const data = buffer.getChannelData(0);
+        const sr = buffer.sampleRate;
+        const a = Math.max(0, Math.floor(fromSec * sr));
+        const b = Math.min(data.length, Math.ceil(toSec * sr));
+        const block = Math.max(1, Math.floor((b - a) / cols));
+        const peaks = [];
+        for (let i = 0; i < cols; i++) {
+          let max = 0;
+          const start = a + i * block;
+          for (let j = 0; j < block; j++) {
+            const v = Math.abs(data[start + j] || 0);
+            if (v > max) max = v;
+          }
+          peaks.push(max);
+        }
+        return peaks;
+      }
+      function drawWave() {
+        const w = wrap.clientWidth,
+          h = 110;
+        canvas.width = w;
+        canvas.height = h;
+        const ctx = canvas.getContext("2d");
+        ctx.clearRect(0, 0, w, h);
+        if (!audioBuffer) return;
+        const cols = Math.max(60, w);
+        const peaks = computePeaks(audioBuffer, viewStart, viewEnd, cols);
+        ctx.fillStyle = "#5aa0f5";
+        const bw = w / cols;
+        for (let i = 0; i < cols; i++) {
+          const bh = Math.max(2, peaks[i] * h);
+          ctx.fillRect(i * bw, (h - bh) / 2, Math.max(1, bw - 1), bh);
+        }
+      }
+
+      // ---- region <-> fields sync ----
+      function renderRegion() {
+        const w = wrap.clientWidth;
+        const x1 = timeToX(startSec),
+          x2 = timeToX(endSec);
+        const cl = Math.max(0, Math.min(w, x1)),
+          cr = Math.max(0, Math.min(w, x2));
+        region.style.left = cl + "px";
+        region.style.width = Math.max(0, cr - cl) + "px";
+        // Show each handle only when its edge is actually within the current view.
+        const lh = region.querySelector(".handle.l"),
+          rh = region.querySelector(".handle.r");
+        lh.style.display = x1 >= 0 && x1 <= w ? "block" : "none";
+        rh.style.display = x2 >= 0 && x2 <= w ? "block" : "none";
+        startIn.value = clock(startSec);
+        endIn.value = clock(endSec);
+        document.getElementById("seldur").textContent = "= " + clock(endSec - startSec) + " ♡";
+      }
+      function commitFields() {
+        const s = parseClock(startIn.value),
+          e = parseClock(endIn.value);
+        if (s !== null) startSec = Math.min(Math.max(0, s), DURATION);
+        if (e !== null) endSec = Math.min(Math.max(startSec, e), DURATION);
+        if (endSec <= startSec) endSec = Math.min(DURATION, startSec + 1);
+        renderRegion();
+      }
+      startIn.addEventListener("change", commitFields);
+      endIn.addEventListener("change", commitFields);
+
+      // ---- drag handles ----
+      let drag = null;
+      region.querySelectorAll(".handle").forEach((el) => {
+        el.addEventListener("pointerdown", (e) => {
+          drag = el.dataset.h;
+          el.setPointerCapture(e.pointerId);
+          e.preventDefault();
+          e.stopPropagation(); // don't also start a pan
+        });
+      });
+
+      // ---- pan (drag anywhere on the waveform body) ----
+      let pan = null;
+      wrap.addEventListener("pointerdown", (e) => {
+        if (drag) return; // a handle already grabbed it
+        pan = { x: e.clientX, vs: viewStart, ve: viewEnd };
+        wrap.setPointerCapture(e.pointerId);
+      });
+      wrap.addEventListener("pointermove", (e) => {
+        const rect = wrap.getBoundingClientRect();
+        if (drag) {
+          const t = Math.min(DURATION, Math.max(0, xToTime(e.clientX - rect.left)));
+          if (drag === "l") startSec = Math.min(t, endSec - MIN_SPAN);
+          else endSec = Math.max(t, startSec + MIN_SPAN);
+          renderRegion();
+          return;
+        }
+        if (pan) {
+          const dt = ((e.clientX - pan.x) / rect.width) * (pan.ve - pan.vs);
+          setView(pan.vs - dt, pan.ve - dt);
+        }
+      });
+      window.addEventListener("pointerup", () => {
+        drag = null;
+        pan = null;
+      });
+
+      // Apply a new [start,end] view, clamped to the track and keeping its span.
+      function setView(vs, ve) {
+        const sp = Math.min(DURATION, Math.max(MIN_SPAN, ve - vs));
+        if (vs < 0) vs = 0;
+        if (vs + sp > DURATION) vs = DURATION - sp;
+        viewStart = Math.max(0, vs);
+        viewEnd = viewStart + sp;
+        drawWave();
+        renderRegion();
+        positionPlayhead();
+      }
+
+      // ---- scroll / trackpad to zoom (anchored under the cursor) ----
+      wrap.addEventListener(
+        "wheel",
+        (e) => {
+          e.preventDefault();
+          const rect = wrap.getBoundingClientRect();
+          const anchor = Math.min(DURATION, Math.max(0, xToTime(e.clientX - rect.left)));
+          // Normalise delta across devices, then zoom proportionally to the scroll
+          // amount (bounded per event) so trackpads don't fly through zoom levels.
+          let dy = e.deltaY;
+          if (e.deltaMode === 1) dy *= 16; // lines → ~px
+          else if (e.deltaMode === 2) dy *= rect.height; // pages → ~px
+          const exponent = Math.max(-0.25, Math.min(0.25, dy * 0.0025));
+          const factor = Math.exp(exponent); // >1 zoom out (scroll down), <1 zoom in
+          const newSpan = Math.min(DURATION, Math.max(MIN_SPAN, span() * factor));
+          const ratio = span() > 0 ? (anchor - viewStart) / span() : 0;
+          setView(anchor - ratio * newSpan, anchor - ratio * newSpan + newSpan);
+        },
+        { passive: false },
+      );
+
+      // ---- double-click to fit the whole track ----
+      wrap.addEventListener("dblclick", () => setView(0, DURATION));
+
+      // ---- preview ----
+      const play = document.getElementById("play");
+      let playing = false;
+      play.addEventListener("click", () => {
+        if (playing) {
+          audio.pause();
+          return;
+        }
+        audio.currentTime = startSec;
+        audio.play();
+        playing = true;
+        play.textContent = "❚❚";
+      });
+      audio.addEventListener("pause", () => {
+        playing = false;
+        play.textContent = "▶";
+        playhead.style.display = "none";
+      });
+      function positionPlayhead() {
+        if (!playing) return;
+        const x = timeToX(audio.currentTime);
+        if (x < 0 || x > wrap.clientWidth) {
+          playhead.style.display = "none";
+        } else {
+          playhead.style.display = "block";
+          playhead.style.left = x + "px";
+        }
+      }
+      audio.addEventListener("timeupdate", () => {
+        if (audio.currentTime >= endSec) {
+          audio.pause();
+          return;
+        }
+        positionPlayhead();
+      });
+
+      // ---- result ----
+      function drop() {
+        const btn = document.getElementById("dropBtn");
+        try {
+          if (btn) btn.textContent = "dropping…";
+          const nameEl = document.getElementById("name");
+          const targetEl = document.getElementById("target");
+          const srEl = document.getElementById("sr");
+          const result = {
+            start: startSec,
+            end: endSec,
+            name: (nameEl && nameEl.value ? nameEl.value : "").trim() || "sample",
+            target: targetEl ? targetEl.value : "selected",
+            sampleRate: srEl ? Number(srEl.value) : 48000,
+          };
+          const message = { method: "close_and_send", params: [JSON.stringify(result)] };
+          if (window.webkit?.messageHandlers?.live) window.webkit.messageHandlers.live.postMessage(message);
+          else if (window.chrome?.webview) window.chrome.webview.postMessage(message);
+        } catch (e) {
+          if (btn) btn.textContent = "drop into set";
+          console.error("drop failed", e);
+        }
+      }
+      // Wire via addEventListener (inline onclick is blocked by the dialog's CSP).
+      document.getElementById("dropBtn").addEventListener("click", drop);
+
+      // ---- init ----
+      document.getElementById("totaldur").textContent = clock(DURATION);
+      (async () => {
+        try {
+          const resp = await fetch(audio.src);
+          const arr = await resp.arrayBuffer();
+          const ctx = new (window.AudioContext || window.webkitAudioContext)();
+          audioBuffer = await ctx.decodeAudioData(arr);
+        } catch (e) {
+          // Waveform is best-effort; trimming by fields still works without it.
+        }
+        drawWave();
+        renderRegion();
+      })();
+    </script>
+  </body>
+</html>

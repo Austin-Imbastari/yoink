@@ -1,0 +1,149 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Yoink</title>
+    <link
+      href="https://fonts.googleapis.com/css2?family=VT323&family=Pixelify+Sans:wght@400;600&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      html,
+      body {
+        margin: 0;
+        height: 100%;
+      }
+      body {
+        font-family: "Pixelify Sans", Tahoma, sans-serif;
+        background: #ece9d8;
+        display: flex;
+        flex-direction: column;
+      }
+      .tbar {
+        background: linear-gradient(180deg, #4a93f8 0%, #2566db 50%, #0f3fb5 100%);
+        color: #ffffff;
+        font-size: 13px;
+        padding: 6px 9px;
+        display: flex;
+        justify-content: space-between;
+      }
+      .mbar {
+        background: #ece9d8;
+        font-size: 13px;
+        padding: 3px 9px;
+        color: #1a3a6e;
+        display: flex;
+        gap: 14px;
+        align-items: center;
+        border-bottom: 1px solid #aca899;
+      }
+      .mbar u {
+        text-decoration: underline;
+      }
+      .sig {
+        margin-left: auto;
+        font-family: "VT323", monospace;
+        color: #5a7fc4;
+      }
+      .body {
+        background: #ffffff;
+        padding: 12px;
+        flex: 1;
+      }
+      .err {
+        background: #e7f0ff;
+        border: 1px solid #7da2e0;
+        color: #1a3f8a;
+        font-family: "VT323", monospace;
+        font-size: 14px;
+        padding: 5px 8px;
+        border-radius: 4px;
+        margin-bottom: 9px;
+      }
+      .lbl {
+        font-size: 11px;
+        color: #4a6fa5;
+        margin-bottom: 3px;
+      }
+      .url {
+        width: 100%;
+        box-sizing: border-box;
+        background: #fff;
+        border: 2px inset #aca899;
+        border-radius: 3px;
+        height: 28px;
+        font-family: "VT323", monospace;
+        font-size: 16px;
+        color: #103a8e;
+        padding: 0 8px;
+      }
+      .row {
+        display: flex;
+        gap: 8px;
+        margin-top: 11px;
+      }
+      button {
+        font-family: inherit;
+        border: 1px solid #fff;
+        border-radius: 5px;
+        padding: 6px 14px;
+        font-size: 13px;
+        cursor: pointer;
+      }
+      .go {
+        background: linear-gradient(180deg, #4a93f8, #1648c4);
+        color: #fff;
+        box-shadow: 1px 1px 0 rgba(20, 60, 160, 0.5);
+      }
+      .cancel {
+        background: #ece9d8;
+        color: #333333;
+        border-color: #aca899;
+      }
+      .hint {
+        font-size: 11px;
+        color: #6f86b0;
+        margin-top: 6px;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="tbar"><span>Yoink youtube links ♡</span><span>_ ▢ ✕</span></div>
+    <div class="mbar">
+      <span><u>F</u>ile</span><span><u>E</u>dit</span><span><u>H</u>elp</span
+      ><span class="sig">Developed by gudimbz ♡</span>
+    </div>
+    <div class="body">
+      <div class="err" id="err" style="display: none">__ERROR__</div>
+      <div class="lbl">PASTE A YOUTUBE LINK</div>
+      <input class="url" id="url" value="__URL__" placeholder="https://youtube.com/watch?v=…" autofocus />
+      <div class="row">
+        <button class="go" onclick="load()">load ♪</button>
+        <button class="cancel" onclick="send('')">cancel</button>
+      </div>
+      <div class="hint" id="hint"></div>
+    </div>
+    <script>
+      function send(result) {
+        const message = { method: "close_and_send", params: [result] };
+        if (window.webkit?.messageHandlers?.live) window.webkit.messageHandlers.live.postMessage(message);
+        else if (window.chrome?.webview) window.chrome.webview.postMessage(message);
+      }
+      function load() {
+        const v = document.getElementById("url").value.trim();
+        if (v) send(v);
+      }
+      // Show the error block only when the token was filled with a real message.
+      const err = document.getElementById("err");
+      if (err.textContent && err.textContent !== "__" + "ERROR__") err.style.display = "block";
+      const urlEl = document.getElementById("url");
+      // A stale error shouldn't linger over a freshly edited URL — clear it on any edit.
+      urlEl.addEventListener("input", () => {
+        err.style.display = "none";
+      });
+      urlEl.addEventListener("keydown", (e) => {
+        if (e.key === "Enter") load();
+      });
+    </script>
+  </body>
+</html>
