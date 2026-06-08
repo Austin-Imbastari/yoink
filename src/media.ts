@@ -136,13 +136,3 @@ export async function fileToDataUri(path: string, mime = "audio/mpeg"): Promise<
   const buf = await readFile(path);
   return `data:${mime};base64,${buf.toString("base64")}`;
 }
-
-/** Best-effort macOS clipboard read; returns "" on any failure. */
-export async function readClipboard(): Promise<string> {
-  try {
-    const { stdout } = await run(resolveBin("pbpaste"), [], runOpts());
-    return stdout;
-  } catch {
-    return "";
-  }
-}

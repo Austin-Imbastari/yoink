@@ -4,9 +4,13 @@ A YouTube → Ableton Live sampler, built on the **Ableton Extensions SDK** (pub
 
 Wrapped in a Y2K / Windows-2000 "MS Paint" aesthetic, because a sampling utility doesn't have to look like a settings panel.
 
+## Download
+
+**[⬇️ Download the latest `.ablx`](https://github.com/Austin-Imbastari/yoink/releases/latest)** — then double-click the file and Ableton Live installs the extension. Right-click any audio track → **Open Yoink ♡**.
+
 ## What it does
 
-- **Paste a URL** (auto-detects a YouTube link already on your clipboard).
+- **Paste a YouTube URL** into the link field.
 - **Fetches** the video's title, channel, and audio.
 - **Waveform trim** — drag the in/out handles, scroll to zoom, drag to pan, hit play to scrub and preview the selection before committing.
 - **Drops the trimmed WAV** into the Arrangement on the selected (or a new) track, named from the video title, at your chosen sample rate.

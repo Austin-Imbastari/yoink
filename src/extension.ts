@@ -103,9 +103,10 @@ export function activate(activation: ActivationContext) {
 
 async function runYoink(context: Ctx, handle: Handle): Promise<void> {
   const tempDir = context.environment.tempDirectory ?? "/tmp";
+  // The URL field starts empty by design — the user explicitly pastes their link.
+  // We deliberately don't read the system clipboard automatically: silently
+  // ingesting clipboard contents is a privacy/security footgun.
   let prefill = "";
-  const clip = await media.readClipboard();
-  if (parseYouTubeUrl(clip)) prefill = clip.trim();
 
   let errorMsg = "";
   // Retry loop: paste → download → trim → import. Errors loop back to the paste window.
