@@ -1,6 +1,27 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { parseMediaUrl, prettyPlatform, secondsToClock, clockToSeconds, sanitizeFilename, escapeHtml, fillTemplate } from "./util.ts";
+import { parseMediaUrl, prettyPlatform, resolveTrackHandle, secondsToClock, clockToSeconds, sanitizeFilename, escapeHtml, fillTemplate } from "./util.ts";
+
+test("resolveTrackHandle: bare AudioTrack handle is returned as-is", () => {
+  const handle = { id: 5n };
+  assert.equal(resolveTrackHandle(handle), handle);
+});
+
+test("resolveTrackHandle: ArrangementSelection returns its first selected lane", () => {
+  const lane = { id: 1n };
+  const selection = { time_selection_start: 0, time_selection_end: 4, selected_lanes: [lane, { id: 2n }] };
+  assert.equal(resolveTrackHandle(selection), lane);
+});
+
+test("resolveTrackHandle: ArrangementSelection with no lanes returns null", () => {
+  const selection = { time_selection_start: 0, time_selection_end: 4, selected_lanes: [] };
+  assert.equal(resolveTrackHandle(selection), null);
+});
+
+test("resolveTrackHandle: null / undefined return null", () => {
+  assert.equal(resolveTrackHandle(null), null);
+  assert.equal(resolveTrackHandle(undefined), null);
+});
 
 test("prettyPlatform: maps known extractor keys to tidy labels", () => {
   assert.equal(prettyPlatform("Youtube"), "YouTube");

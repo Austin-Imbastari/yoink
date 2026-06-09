@@ -70,6 +70,21 @@ export function prettyPlatform(extractor: string): string {
   return PLATFORM_LABELS[key] ?? trimmed;
 }
 
+/**
+ * Normalize a context-menu command argument to a target track handle. The `"AudioTrack"`
+ * scope passes a bare `Handle` ({ id }); the `"AudioTrack.ArrangementSelection"` scope passes
+ * a selection whose `selected_lanes[0]` is the track. Returns null when no track can be
+ * derived (e.g. an empty selection). Kept SDK-type-agnostic (generic `H`) so it stays pure
+ * and unit-testable without importing the SDK.
+ */
+export function resolveTrackHandle<H>(arg: unknown): H | null {
+  if (arg && typeof arg === "object") {
+    const lanes = (arg as { selected_lanes?: unknown }).selected_lanes;
+    if (Array.isArray(lanes)) return lanes.length > 0 ? (lanes[0] as H) : null;
+  }
+  return (arg ?? null) as H | null;
+}
+
 /** Seconds → "m:ss" (or "h:mm:ss" past an hour). Negative/NaN clamp to 0. */
 export function secondsToClock(totalSeconds: number): string {
   const s = Math.max(0, Math.floor(Number.isFinite(totalSeconds) ? totalSeconds : 0));

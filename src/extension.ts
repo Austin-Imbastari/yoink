@@ -4,7 +4,7 @@ import { join } from "node:path";
 import pasteHtml from "../ui/paste.html";
 import trimHtml from "../ui/trim.html";
 
-import { parseMediaUrl, sanitizeFilename, escapeHtml, fillTemplate, secondsToClock } from "./util.ts";
+import { parseMediaUrl, resolveTrackHandle, sanitizeFilename, escapeHtml, fillTemplate, secondsToClock } from "./util.ts";
 import * as media from "./media.ts";
 
 type Ctx = ExtensionContext<"1.0.0">;
@@ -95,11 +95,21 @@ export function activate(activation: ActivationContext) {
   }
 
   context.commands.registerCommand("yt-ableton.openYoink", (...args: unknown[]) => {
-    const handle = args[0] as Handle;
+    // The command is reachable from two scopes with different first args: the "AudioTrack"
+    // scope passes the track Handle directly; the "AudioTrack.ArrangementSelection" scope
+    // passes a selection whose first lane is the track. Normalize both to a track handle.
+    const handle = resolveTrackHandle<Handle>(args[0]);
+    if (!handle) {
+      console.log("[yoink] openYoink: no target track in", args[0]);
+      return;
+    }
     runYoink(context, handle).catch((e) => console.log("[yoink] runYoink crashed:", e));
   });
 
+  // Register under both scopes so Yoink appears whether the user right-clicks the audio
+  // track itself or a selection in its arrangement timeline.
   void context.ui.registerContextMenuAction("AudioTrack", "Open Yoink ♡", "yt-ableton.openYoink");
+  void context.ui.registerContextMenuAction("AudioTrack.ArrangementSelection", "Open Yoink ♡", "yt-ableton.openYoink");
 }
 
 async function runYoink(context: Ctx, handle: Handle): Promise<void> {
