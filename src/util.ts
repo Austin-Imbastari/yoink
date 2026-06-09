@@ -85,6 +85,25 @@ export function resolveTrackHandle<H>(arg: unknown): H | null {
   return (arg ?? null) as H | null;
 }
 
+/** Convert a real-time duration in seconds to musical beats at the given tempo (BPM). */
+export function secondsToBeats(seconds: number, tempo: number): number {
+  if (!Number.isFinite(seconds) || !Number.isFinite(tempo) || seconds <= 0 || tempo <= 0) return 0;
+  return (seconds * tempo) / 60;
+}
+
+/**
+ * The arrangement drop position (in beats) from a context-menu command argument. The
+ * `"AudioTrack.ArrangementSelection"` scope passes a selection with `time_selection_start`;
+ * the `"AudioTrack"` scope passes a bare handle with none. Returns 0 (bar 1) when absent.
+ */
+export function selectionStartBeats(arg: unknown): number {
+  if (arg && typeof arg === "object") {
+    const start = (arg as { time_selection_start?: unknown }).time_selection_start;
+    if (typeof start === "number" && Number.isFinite(start) && start > 0) return start;
+  }
+  return 0;
+}
+
 /** Seconds → "m:ss" (or "h:mm:ss" past an hour). Negative/NaN clamp to 0. */
 export function secondsToClock(totalSeconds: number): string {
   const s = Math.max(0, Math.floor(Number.isFinite(totalSeconds) ? totalSeconds : 0));

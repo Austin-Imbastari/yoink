@@ -4,7 +4,7 @@ import { join } from "node:path";
 import pasteHtml from "../ui/paste.html";
 import trimHtml from "../ui/trim.html";
 
-import { parseMediaUrl, resolveTrackHandle, sanitizeFilename, escapeHtml, fillTemplate, secondsToClock } from "./util.ts";
+import { parseMediaUrl, resolveTrackHandle, selectionStartBeats, secondsToBeats, sanitizeFilename, escapeHtml, fillTemplate, secondsToClock } from "./util.ts";
 import * as media from "./media.ts";
 
 type Ctx = ExtensionContext<"1.0.0">;
@@ -15,6 +15,8 @@ interface TrimResult {
   name: string;
   target: "selected" | "new";
   sampleRate: number;
+  warp: boolean;
+  loop: boolean;
 }
 
 /** Last meaningful line of a subprocess failure — stderr beats the generic "Command failed" message. */
@@ -69,7 +71,14 @@ async function showTrim(
   }
 }
 
-async function importClip(ctx: Ctx, handle: Handle, fullPath: string, tempDir: string, r: TrimResult): Promise<void> {
+async function importClip(
+  ctx: Ctx,
+  handle: Handle,
+  fullPath: string,
+  tempDir: string,
+  r: TrimResult,
+  dropBeats: number,
+): Promise<void> {
   const wavPath = join(tempDir, `${sanitizeFilename(r.name)}.wav`);
   await media.trimToWav(fullPath, wavPath, r.start, r.end, r.sampleRate);
   const imported = await ctx.resources.importIntoProject(wavPath);
@@ -79,8 +88,27 @@ async function importClip(ctx: Ctx, handle: Handle, fullPath: string, tempDir: s
     r.target === "new"
       ? await ctx.application.song.createAudioTrack()
       : ctx.getObjectFromHandle(handle, AudioTrack);
-  // Drop into the Arrangement timeline at bar 1.
-  const clip = await track.createAudioClip({ filePath: imported, startTime: 0, isWarped: false });
+
+  // Looping requires a warped clip (SDK constraint), so loop forces warp on.
+  const isWarped = r.warp || r.loop;
+  const clipArgs: Parameters<typeof track.createAudioClip>[0] = {
+    filePath: imported,
+    startTime: dropBeats, // selection start in beats, or 0 (bar 1)
+    isWarped,
+  };
+  if (r.loop) {
+    // Loop the whole trimmed region. Markers are in beats, so convert the selection's
+    // real-time length using the Set tempo.
+    const lengthBeats = secondsToBeats(r.end - r.start, ctx.application.song.tempo);
+    clipArgs.loopSettings = {
+      looping: true,
+      startMarker: 0,
+      endMarker: lengthBeats,
+      loopStart: 0,
+      loopEnd: lengthBeats,
+    };
+  }
+  const clip = await track.createAudioClip(clipArgs);
   clip.name = r.name;
 }
 
@@ -103,7 +131,9 @@ export function activate(activation: ActivationContext) {
       console.log("[yoink] openYoink: no target track in", args[0]);
       return;
     }
-    runYoink(context, handle).catch((e) => console.log("[yoink] runYoink crashed:", e));
+    // From a timeline selection, drop at its start; from the track menu, bar 1 (0).
+    const dropBeats = selectionStartBeats(args[0]);
+    runYoink(context, handle, dropBeats).catch((e) => console.log("[yoink] runYoink crashed:", e));
   });
 
   // Register under both scopes so Yoink appears whether the user right-clicks the audio
@@ -112,7 +142,7 @@ export function activate(activation: ActivationContext) {
   void context.ui.registerContextMenuAction("AudioTrack.ArrangementSelection", "Open Yoink ♡", "yt-ableton.openYoink");
 }
 
-async function runYoink(context: Ctx, handle: Handle): Promise<void> {
+async function runYoink(context: Ctx, handle: Handle, dropBeats: number): Promise<void> {
   const tempDir = context.environment.tempDirectory ?? "/tmp";
   // The URL field starts empty by design — the user explicitly pastes their link.
   // We deliberately don't read the system clipboard automatically: silently
@@ -155,7 +185,7 @@ async function runYoink(context: Ctx, handle: Handle): Promise<void> {
         return;
       }
 
-      await importClip(context, handle, result.fullPath, tempDir, trim);
+      await importClip(context, handle, result.fullPath, tempDir, trim, dropBeats);
       // Drop succeeded; the sample lives in the project now. Remove the full download + preview.
       await media.removeFiles([result.fullPath, result.previewPath]);
       return; // done ♡

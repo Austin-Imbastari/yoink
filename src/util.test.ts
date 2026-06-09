@@ -1,6 +1,28 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { parseMediaUrl, prettyPlatform, resolveTrackHandle, secondsToClock, clockToSeconds, sanitizeFilename, escapeHtml, fillTemplate } from "./util.ts";
+import { parseMediaUrl, prettyPlatform, resolveTrackHandle, secondsToBeats, selectionStartBeats, secondsToClock, clockToSeconds, sanitizeFilename, escapeHtml, fillTemplate } from "./util.ts";
+
+test("secondsToBeats: converts using tempo (120bpm => 2 beats/sec)", () => {
+  assert.equal(secondsToBeats(1, 120), 2);
+  assert.equal(secondsToBeats(4, 120), 8);
+  assert.equal(secondsToBeats(2, 90), 3);
+});
+
+test("secondsToBeats: negative or NaN inputs clamp to 0", () => {
+  assert.equal(secondsToBeats(-5, 120), 0);
+  assert.equal(secondsToBeats(NaN, 120), 0);
+  assert.equal(secondsToBeats(2, NaN), 0);
+});
+
+test("selectionStartBeats: reads time_selection_start from a selection", () => {
+  assert.equal(selectionStartBeats({ time_selection_start: 12.5, time_selection_end: 16, selected_lanes: [] }), 12.5);
+});
+
+test("selectionStartBeats: bare handle / null / missing => 0", () => {
+  assert.equal(selectionStartBeats({ id: 5n }), 0);
+  assert.equal(selectionStartBeats(null), 0);
+  assert.equal(selectionStartBeats(undefined), 0);
+});
 
 test("resolveTrackHandle: bare AudioTrack handle is returned as-is", () => {
   const handle = { id: 5n };

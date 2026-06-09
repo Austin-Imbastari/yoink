@@ -184,6 +184,21 @@
         box-sizing: border-box;
         width: 100%;
       }
+      .chk-row {
+        display: flex;
+        gap: 16px;
+      }
+      .chk {
+        display: flex;
+        align-items: center;
+        gap: 5px;
+        cursor: pointer;
+        user-select: none;
+      }
+      .chk input {
+        margin: 0;
+        cursor: pointer;
+      }
       .footer {
         display: flex;
         align-items: center;
@@ -240,6 +255,11 @@
           <option value="selected">selected track</option>
           <option value="new">new track</option>
         </select>
+        <span>options</span>
+        <div class="chk-row">
+          <label class="chk"><input type="checkbox" id="warp" /> ⊕ warp</label>
+          <label class="chk"><input type="checkbox" id="loop" /> ↻ loop</label>
+        </div>
       </div>
     </div>
     <div class="footer">
@@ -260,6 +280,16 @@
       const audio = document.getElementById("audio");
       const startIn = document.getElementById("start");
       const endIn = document.getElementById("end");
+      const warpEl = document.getElementById("warp");
+      const loopEl = document.getElementById("loop");
+      // Live only loops warped clips, so keep the two checkboxes in a legal state:
+      // ticking loop forces warp on; un-ticking warp forces loop off.
+      loopEl.addEventListener("change", () => {
+        if (loopEl.checked) warpEl.checked = true;
+      });
+      warpEl.addEventListener("change", () => {
+        if (!warpEl.checked) loopEl.checked = false;
+      });
 
       // ---- view window (zoom / pan) ----
       let viewStart = 0,
@@ -453,9 +483,9 @@
         }
       }
       audio.addEventListener("timeupdate", () => {
+        // Loop the selected region so the user can audition the part on repeat.
         if (audio.currentTime >= endSec) {
-          audio.pause();
-          return;
+          audio.currentTime = startSec;
         }
         positionPlayhead();
       });
@@ -474,6 +504,8 @@
             name: (nameEl && nameEl.value ? nameEl.value : "").trim() || "sample",
             target: targetEl ? targetEl.value : "selected",
             sampleRate: srEl ? Number(srEl.value) : 48000,
+            warp: warpEl.checked,
+            loop: loopEl.checked,
           };
           const message = { method: "close_and_send", params: [JSON.stringify(result)] };
           if (window.webkit?.messageHandlers?.live) window.webkit.messageHandlers.live.postMessage(message);
