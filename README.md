@@ -1,6 +1,6 @@
 # Yoink ♡
 
-A YouTube → Ableton Live sampler, built on the **Ableton Extensions SDK** (public beta). Right-click an audio track, paste a YouTube link, trim the exact section you want on a waveform, and it drops into your Set as a WAV — ready to chop. No bouncing out to a browser, a downloader, and a file manager mid-session.
+A web-audio → Ableton Live sampler, built on the **Ableton Extensions SDK** (public beta). Right-click an audio track, paste a link from YouTube, TikTok, Instagram, SoundCloud, or [anywhere else yt-dlp supports](https://github.com/yt-dlp/yt-dlp/blob/master/supportedsites.md), trim the exact section you want on a waveform, and it drops into your Set as a WAV — ready to chop. No bouncing out to a browser, a downloader, and a file manager mid-session.
 
 Wrapped in a Y2K / Windows-2000 "MS Paint" aesthetic, because a sampling utility doesn't have to look like a settings panel.
 
@@ -10,7 +10,7 @@ Wrapped in a Y2K / Windows-2000 "MS Paint" aesthetic, because a sampling utility
 
 ## What it does
 
-- **Paste a YouTube URL** into the link field.
+- **Paste any link** — YouTube, TikTok, Instagram, SoundCloud, and more (anything yt-dlp supports). The platform is auto-detected from the URL.
 - **Fetches** the video's title, channel, and audio.
 - **Waveform trim** — drag the in/out handles, scroll to zoom, drag to pan, hit play to scrub and preview the selection before committing.
 - **Drops the trimmed WAV** into the Arrangement on the selected (or a new) track, named from the video title, at your chosen sample rate.
