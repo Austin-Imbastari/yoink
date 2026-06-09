@@ -124,6 +124,55 @@
         border-radius: 3px;
         white-space: nowrap;
       }
+      .beatrow {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        margin-bottom: 9px;
+        font-size: 13px;
+        color: #1a3a6e;
+      }
+      .bpmread {
+        font-weight: bold;
+        min-width: 60px;
+      }
+      .tapbtn {
+        background: #ece9d8;
+        border: 1px solid #aca899;
+        border-radius: 4px;
+        padding: 2px 12px;
+        font-family: inherit;
+        font-size: 12px;
+        color: #333;
+        cursor: pointer;
+      }
+      .tapbtn:active {
+        background: #4a93f8;
+        color: #fff;
+      }
+      .keypill {
+        background: #1648c4;
+        color: #fff;
+        font-size: 11px;
+        padding: 1px 8px;
+        border-radius: 3px;
+      }
+      .keypill:empty {
+        display: none;
+      }
+      .snaplbl {
+        margin-left: auto;
+        display: flex;
+        align-items: center;
+        gap: 4px;
+        cursor: pointer;
+        user-select: none;
+        font-size: 12px;
+      }
+      .snaplbl input {
+        margin: 0;
+        cursor: pointer;
+      }
       .ctrls {
         display: flex;
         align-items: center;
@@ -248,6 +297,12 @@
         <div class="tg">end <input class="tin" id="end" /></div>
         <span class="dur" id="seldur"></span>
       </div>
+      <div class="beatrow">
+        <span class="bpmread">♩ <span id="bpmval">--</span></span>
+        <button class="tapbtn" id="tap">tap</button>
+        <span class="keypill" id="keypill"></span>
+        <label class="snaplbl"><input type="checkbox" id="snap" checked /> ⊹ snap</label>
+      </div>
       <div class="opts">
         <span>name</span><input class="opt-in" id="name" value="__NAME__" />
         <span>drop on</span>
@@ -272,6 +327,10 @@
       const DURATION = Number("__DURATION__") || 0; // full video length in seconds
       let startSec = Math.min(Number("__START_SEC__") || 0, DURATION);
       let endSec = DURATION;
+      // Detected tempo/key (host-side). bpm 0 = detection failed; grid hidden until tapped.
+      let bpm = Number("__BPM__") || 0;
+      let phase = Number("__PHASE__") || 0; // seconds from sample start to the first beat
+      const detectedKey = "__KEY__";
 
       const wrap = document.getElementById("wrap");
       const canvas = document.getElementById("wave");
@@ -350,6 +409,23 @@
           const bh = Math.max(2, peaks[i] * h);
           ctx.fillRect(i * bw, (h - bh) / 2, Math.max(1, bw - 1), bh);
         }
+        drawGrid(ctx, w, h);
+      }
+      // Vertical beat lines from the detected/tapped tempo; every 4th (a bar) is brighter.
+      function drawGrid(ctx, w, h) {
+        if (bpm <= 0) return;
+        const beatSec = 60 / bpm;
+        let n = Math.ceil((viewStart - phase) / beatSec);
+        for (let t = phase + n * beatSec; t <= viewEnd; t += beatSec, n++) {
+          const x = Math.round(timeToX(t)) + 0.5;
+          const isBar = ((n % 4) + 4) % 4 === 0;
+          ctx.strokeStyle = isBar ? "rgba(22,72,196,0.55)" : "rgba(22,72,196,0.2)";
+          ctx.lineWidth = isBar ? 1.5 : 1;
+          ctx.beginPath();
+          ctx.moveTo(x, 0);
+          ctx.lineTo(x, h);
+          ctx.stroke();
+        }
       }
 
       // ---- region <-> fields sync ----
@@ -402,7 +478,8 @@
       wrap.addEventListener("pointermove", (e) => {
         const rect = wrap.getBoundingClientRect();
         if (drag) {
-          const t = Math.min(DURATION, Math.max(0, xToTime(e.clientX - rect.left)));
+          let t = Math.min(DURATION, Math.max(0, xToTime(e.clientX - rect.left)));
+          if (!e.altKey) t = snapTime(t); // hold Alt while dragging to bypass snapping
           if (drag === "l") startSec = Math.min(t, endSec - MIN_SPAN);
           else endSec = Math.max(t, startSec + MIN_SPAN);
           renderRegion();
@@ -518,8 +595,51 @@
       // Wire via addEventListener (inline onclick is blocked by the dialog's CSP).
       document.getElementById("dropBtn").addEventListener("click", drop);
 
+      // ---- beat grid: snap, tap-tempo, readout ----
+      const snapEl = document.getElementById("snap");
+      const bpmValEl = document.getElementById("bpmval");
+      const keyPillEl = document.getElementById("keypill");
+      const tapBtn = document.getElementById("tap");
+
+      // Snap a time (seconds) to the nearest beat line, when snapping is on and we have a tempo.
+      function snapTime(t) {
+        if (!snapEl.checked || bpm <= 0) return t;
+        const beatSec = 60 / bpm;
+        const snapped = phase + Math.round((t - phase) / beatSec) * beatSec;
+        return Math.min(DURATION, Math.max(0, snapped));
+      }
+      function updateBpmReadout() {
+        bpmValEl.textContent = bpm > 0 ? String(Math.round(bpm)) : "--";
+      }
+
+      // Tap tempo: BPM from the average wall-clock interval; phase re-anchored to the audio
+      // position of the latest tap (only possible while the preview is playing).
+      let taps = [];
+      tapBtn.addEventListener("click", () => {
+        const wall = performance.now() / 1000;
+        if (taps.length && wall - taps[taps.length - 1].wall > 2) taps = []; // stale → restart
+        taps.push({ wall, audio: playing ? audio.currentTime : null });
+        if (taps.length > 8) taps.shift();
+        if (taps.length >= 2) {
+          let sum = 0;
+          for (let i = 1; i < taps.length; i++) sum += taps[i].wall - taps[i - 1].wall;
+          const avg = sum / (taps.length - 1);
+          if (avg > 0.25 && avg < 2) {
+            bpm = Math.round((60 / avg) * 10) / 10;
+            const beatSec = 60 / bpm;
+            const lastAudio = taps[taps.length - 1].audio;
+            if (lastAudio != null) phase = ((lastAudio % beatSec) + beatSec) % beatSec;
+            updateBpmReadout();
+            drawWave();
+            renderRegion();
+          }
+        }
+      });
+
       // ---- init ----
       document.getElementById("totaldur").textContent = clock(DURATION);
+      updateBpmReadout();
+      keyPillEl.textContent = detectedKey || "";
       // Hide the source badge when yt-dlp didn't give us a recognizable platform name.
       const platEl = document.getElementById("plat");
       if (platEl && !platEl.textContent.trim()) platEl.style.display = "none";

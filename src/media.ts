@@ -84,6 +84,13 @@ export function buildPreviewArgs(srcPath: string, outPath: string): string[] {
   return ["-y", "-i", srcPath, "-ac", "1", "-c:a", "libmp3lame", "-b:a", "96k", outPath];
 }
 
+/** Decode to mono 32-bit-float PCM at 11025 Hz — the input for BPM/key analysis. */
+export function buildPcmArgs(srcPath: string, outPath: string): string[] {
+  return ["-y", "-i", srcPath, "-ac", "1", "-ar", "11025", "-f", "f32le", outPath];
+}
+
+export const PCM_SAMPLE_RATE = 11025;
+
 export function buildTrimArgs(
   srcPath: string,
   outPath: string,
@@ -122,6 +129,26 @@ export async function downloadAudio(url: string, outTemplate: string): Promise<s
 export async function makePreview(srcPath: string, outPath: string): Promise<string> {
   await run(resolveBin("ffmpeg"), buildPreviewArgs(srcPath, outPath), runOpts());
   return outPath;
+}
+
+/**
+ * Decode `srcPath` to mono f32le PCM at {@link PCM_SAMPLE_RATE} and return it as a
+ * Float32Array for analysis. Best-effort: returns an empty array on any failure so detection
+ * is never fatal to the import. The temp PCM file is removed afterward.
+ */
+export async function extractPcm(srcPath: string, outPath: string): Promise<Float32Array> {
+  try {
+    await run(resolveBin("ffmpeg"), buildPcmArgs(srcPath, outPath), runOpts());
+    const buf = await readFile(outPath);
+    const samples = new Float32Array(buf.buffer, buf.byteOffset, Math.floor(buf.length / 4));
+    // Copy off the Buffer's backing store before we delete the file / it gets reused.
+    const out = new Float32Array(samples);
+    await rm(outPath, { force: true }).catch(() => {});
+    return out;
+  } catch {
+    await rm(outPath, { force: true }).catch(() => {});
+    return new Float32Array(0);
+  }
 }
 
 export async function trimToWav(

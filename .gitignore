@@ -7,3 +7,5 @@ dist/
 *.tsbuildinfo
 
 .env
+
+.superpowers/

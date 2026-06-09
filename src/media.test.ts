@@ -1,9 +1,15 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { buildInfoArgs, buildDownloadArgs, buildPreviewArgs, buildTrimArgs } from "./media.ts";
+import { buildInfoArgs, buildDownloadArgs, buildPreviewArgs, buildTrimArgs, buildPcmArgs } from "./media.ts";
 
 test("buildInfoArgs: single-json, no playlist", () => {
   assert.deepEqual(buildInfoArgs("URL"), ["--dump-single-json", "--no-playlist", "URL"]);
+});
+
+test("buildPcmArgs: mono f32le at 11025 Hz", () => {
+  assert.deepEqual(buildPcmArgs("/tmp/a.mp3", "/tmp/a.pcm"), [
+    "-y", "-i", "/tmp/a.mp3", "-ac", "1", "-ar", "11025", "-f", "f32le", "/tmp/a.pcm",
+  ]);
 });
 
 test("buildDownloadArgs: bestaudio, prints the final written path", () => {

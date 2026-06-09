@@ -1,6 +1,80 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { parseMediaUrl, prettyPlatform, resolveTrackHandle, secondsToBeats, selectionStartBeats, secondsToClock, clockToSeconds, sanitizeFilename, escapeHtml, fillTemplate } from "./util.ts";
+import { parseMediaUrl, prettyPlatform, resolveTrackHandle, secondsToBeats, selectionStartBeats, detectBpm, goertzelMagnitude, chromaToKey, detectKey, secondsToClock, clockToSeconds, sanitizeFilename, escapeHtml, fillTemplate } from "./util.ts";
+
+// Krumhansl–Schmuckler major/minor profiles (tonic = C), used to build fixtures.
+const KS_MAJOR = [6.35, 2.23, 3.48, 2.33, 4.38, 4.09, 2.52, 5.19, 2.39, 3.66, 2.29, 2.88];
+const KS_MINOR = [6.33, 2.68, 3.52, 5.38, 2.6, 3.53, 2.54, 4.75, 3.98, 2.69, 3.34, 3.17];
+const rotateProfile = (profile: number[], tonic: number) => profile.map((_, p) => profile[(p - tonic + 12) % 12]);
+
+function sine(sampleRate: number, durationSec: number, freq: number) {
+  const n = Math.floor(sampleRate * durationSec);
+  const a = new Float32Array(n);
+  for (let i = 0; i < n; i++) a[i] = Math.sin((2 * Math.PI * freq * i) / sampleRate);
+  return a;
+}
+
+test("goertzelMagnitude: peaks at the signal's frequency", () => {
+  const sr = 11025;
+  const s = sine(sr, 1, 440);
+  const atTone = goertzelMagnitude(s, 440, sr);
+  const offTone = goertzelMagnitude(s, 466.16, sr); // A#4, a semitone up
+  assert.ok(atTone > offTone * 5, `440Hz (${atTone}) should dominate 466Hz (${offTone})`);
+});
+
+test("chromaToKey: Krumhansl major profile resolves to C maj", () => {
+  assert.equal(chromaToKey(KS_MAJOR), "C maj");
+});
+
+test("chromaToKey: Krumhansl minor profile resolves to C min", () => {
+  assert.equal(chromaToKey(KS_MINOR), "C min");
+});
+
+test("chromaToKey: a profile rotated to A resolves to A maj", () => {
+  assert.equal(chromaToKey(rotateProfile(KS_MAJOR, 9)), "A maj");
+});
+
+test("detectKey: returns a well-formed key label", () => {
+  const key = detectKey(sine(11025, 2, 440), 11025);
+  assert.match(key, /^[A-G]#? (maj|min)$/);
+});
+
+test("detectKey: empty input returns empty string", () => {
+  assert.equal(detectKey(new Float32Array(0), 11025), "");
+});
+
+/** A synthetic click track: a short decaying impulse on every beat at the given tempo. */
+function clickTrack(sampleRate: number, durationSec: number, bpm: number): Float32Array {
+  const n = Math.floor(sampleRate * durationSec);
+  const a = new Float32Array(n);
+  const period = (sampleRate * 60) / bpm; // samples per beat
+  for (let t = 0; t < n; t += period) {
+    const i = Math.round(t);
+    for (let k = 0; k < 24 && i + k < n; k++) a[i + k] = Math.exp(-k / 5);
+  }
+  return a;
+}
+
+test("detectBpm: finds 120 BPM on a click track, grid aligned to the beats", () => {
+  const sr = 11025;
+  const { bpm, phase } = detectBpm(clickTrack(sr, 10, 120), sr);
+  assert.ok(Math.abs(bpm - 120) <= 3, `expected ~120, got ${bpm}`);
+  // Phase is only meaningful modulo the beat period (0.5s @120). Check the detected grid
+  // lands within ~1 frame-or-two of a true beat; exact phase is approximate by design.
+  const period = 0.5;
+  const err = Math.min(phase % period, period - (phase % period));
+  assert.ok(err < 0.12, `grid misaligned by ${err}s`);
+});
+
+test("detectBpm: finds 90 BPM on a click track", () => {
+  const sr = 11025;
+  const { bpm } = detectBpm(clickTrack(sr, 10, 90), sr);
+  assert.ok(Math.abs(bpm - 90) <= 3, `expected ~90, got ${bpm}`);
+});
+
+test("detectBpm: empty/too-short input returns 0 bpm", () => {
+  assert.equal(detectBpm(new Float32Array(0), 11025).bpm, 0);
+});
 
 test("secondsToBeats: converts using tempo (120bpm => 2 beats/sec)", () => {
   assert.equal(secondsToBeats(1, 120), 2);

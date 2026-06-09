@@ -104,6 +104,176 @@ export function selectionStartBeats(arg: unknown): number {
   return 0;
 }
 
+/**
+ * Half-wave-rectified energy-novelty envelope: per `hop`-sample frame, how much louder it
+ * got than the previous frame. Onsets (drum hits, note attacks) show up as positive spikes.
+ */
+export function onsetEnvelope(samples: Float32Array, hop = 512): Float32Array {
+  const nFrames = Math.floor(samples.length / hop);
+  if (nFrames < 2) return new Float32Array(0);
+  const rms = new Float32Array(nFrames);
+  for (let f = 0; f < nFrames; f++) {
+    let sum = 0;
+    const base = f * hop;
+    for (let j = 0; j < hop; j++) {
+      const s = samples[base + j];
+      sum += s * s;
+    }
+    rms[f] = Math.sqrt(sum / hop);
+  }
+  const env = new Float32Array(nFrames);
+  env[0] = rms[0]; // treat pre-signal as silence so an onset on frame 0 still registers
+  for (let f = 1; f < nFrames; f++) env[f] = Math.max(0, rms[f] - rms[f - 1]);
+  return env;
+}
+
+/**
+ * Estimate tempo (BPM) and beat phase (seconds to the first beat) from raw mono PCM, by
+ * autocorrelating the onset envelope. Best-effort: prone to half/double-time errors (folded
+ * into a preferred 70–140 range) and an approximate phase — the trim window's tap-tempo
+ * lets the user correct both. Returns `{ bpm: 0, phase: 0 }` when the input is too short.
+ */
+export function detectBpm(samples: Float32Array, sampleRate: number, hop = 512): { bpm: number; phase: number } {
+  const env = onsetEnvelope(samples, hop);
+  if (env.length < 8 || sampleRate <= 0) return { bpm: 0, phase: 0 };
+  const envRate = sampleRate / hop;
+
+  const minLag = Math.max(1, Math.round((60 * envRate) / 180));
+  const maxLag = Math.min(env.length - 1, Math.round((60 * envRate) / 60));
+  const ac = new Float32Array(maxLag + 2);
+  let bestLag = minLag;
+  let bestVal = -1;
+  for (let lag = minLag; lag <= maxLag; lag++) {
+    let sum = 0;
+    for (let i = lag; i < env.length; i++) sum += env[i] * env[i - lag];
+    const norm = sum / (env.length - lag); // remove the bias toward shorter lags
+    ac[lag] = norm;
+    if (norm > bestVal) {
+      bestVal = norm;
+      bestLag = lag;
+    }
+  }
+  // Parabolic interpolation around the peak for sub-frame lag precision.
+  let refined = bestLag;
+  const lm = ac[bestLag - 1] ?? 0;
+  const lp = ac[bestLag + 1] ?? 0;
+  const denom = lm - 2 * ac[bestLag] + lp;
+  if (denom !== 0) refined = bestLag + (0.5 * (lm - lp)) / denom;
+
+  let bpm = (60 * envRate) / refined;
+  while (bpm < 70) bpm *= 2;
+  while (bpm > 140) bpm /= 2;
+
+  // Phase: which beat offset best lines up with the onset peaks.
+  const period = refined;
+  let bestOff = 0;
+  let bestOffVal = -1;
+  for (let off = 0; off < period; off += 1) {
+    let sum = 0;
+    // Window ±1 frame so beat positions still catch a spike despite fractional-period rounding.
+    for (let pos = off; pos < env.length; pos += period) {
+      const c = Math.round(pos);
+      sum += Math.max(env[c - 1] ?? 0, env[c] ?? 0, env[c + 1] ?? 0);
+    }
+    if (sum > bestOffVal) {
+      bestOffVal = sum;
+      bestOff = off;
+    }
+  }
+  const phase = (bestOff * hop) / sampleRate;
+  return { bpm: Math.round(bpm * 10) / 10, phase };
+}
+
+/**
+ * Goertzel magnitude — the energy of `samples` at a single frequency, normalized by length.
+ * Cheaper than a full FFT when you only need a handful of target frequencies (the semitones).
+ */
+export function goertzelMagnitude(samples: Float32Array, freq: number, sampleRate: number): number {
+  if (samples.length === 0 || sampleRate <= 0) return 0;
+  const coeff = 2 * Math.cos((2 * Math.PI * freq) / sampleRate);
+  let s1 = 0;
+  let s2 = 0;
+  for (let i = 0; i < samples.length; i++) {
+    const s0 = samples[i] + coeff * s1 - s2;
+    s2 = s1;
+    s1 = s0;
+  }
+  const power = s1 * s1 + s2 * s2 - coeff * s1 * s2;
+  return Math.sqrt(Math.max(0, power)) / samples.length;
+}
+
+const NOTE_NAMES = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"];
+const KRUMHANSL_MAJOR = [6.35, 2.23, 3.48, 2.33, 4.38, 4.09, 2.52, 5.19, 2.39, 3.66, 2.29, 2.88];
+const KRUMHANSL_MINOR = [6.33, 2.68, 3.52, 5.38, 2.6, 3.53, 2.54, 4.75, 3.98, 2.69, 3.34, 3.17];
+
+function pearson(a: number[], b: number[]): number {
+  const n = a.length;
+  let ma = 0;
+  let mb = 0;
+  for (let i = 0; i < n; i++) {
+    ma += a[i];
+    mb += b[i];
+  }
+  ma /= n;
+  mb /= n;
+  let num = 0;
+  let da = 0;
+  let db = 0;
+  for (let i = 0; i < n; i++) {
+    const x = a[i] - ma;
+    const y = b[i] - mb;
+    num += x * y;
+    da += x * x;
+    db += y * y;
+  }
+  return da === 0 || db === 0 ? 0 : num / Math.sqrt(da * db);
+}
+
+/** Sum Goertzel energy per semitone (MIDI 36–83) into 12 pitch-class bins. */
+export function chromaVector(samples: Float32Array, sampleRate: number): number[] {
+  const chroma = new Array(12).fill(0);
+  if (samples.length === 0 || sampleRate <= 0) return chroma;
+  // Key is stable; analyzing the first ~60s keeps Goertzel fast and numerically sane.
+  const slice = samples.length > sampleRate * 60 ? samples.subarray(0, sampleRate * 60) : samples;
+  for (let midi = 36; midi <= 83; midi++) {
+    const freq = 440 * Math.pow(2, (midi - 69) / 12);
+    if (freq >= sampleRate / 2) continue;
+    chroma[midi % 12] += goertzelMagnitude(slice, freq, sampleRate);
+  }
+  return chroma;
+}
+
+/**
+ * Best-matching key for a 12-bin chroma vector, via correlation against the
+ * Krumhansl–Schmuckler major/minor profiles rotated to all 12 tonics. Returns e.g. "A min".
+ * Best-effort (~70%): relative major/minor are easily confused.
+ */
+export function chromaToKey(chroma: number[]): string {
+  let bestScore = -Infinity;
+  let bestName = "";
+  for (let tonic = 0; tonic < 12; tonic++) {
+    const maj = chroma.map((_, p) => KRUMHANSL_MAJOR[(p - tonic + 12) % 12]);
+    const sMaj = pearson(chroma, maj);
+    if (sMaj > bestScore) {
+      bestScore = sMaj;
+      bestName = `${NOTE_NAMES[tonic]} maj`;
+    }
+    const min = chroma.map((_, p) => KRUMHANSL_MINOR[(p - tonic + 12) % 12]);
+    const sMin = pearson(chroma, min);
+    if (sMin > bestScore) {
+      bestScore = sMin;
+      bestName = `${NOTE_NAMES[tonic]} min`;
+    }
+  }
+  return bestName;
+}
+
+/** Detect the musical key of raw mono PCM. Returns "" for empty input. Best-effort (~70%). */
+export function detectKey(samples: Float32Array, sampleRate: number): string {
+  if (samples.length === 0 || sampleRate <= 0) return "";
+  return chromaToKey(chromaVector(samples, sampleRate));
+}
+
 /** Seconds → "m:ss" (or "h:mm:ss" past an hour). Negative/NaN clamp to 0. */
 export function secondsToClock(totalSeconds: number): string {
   const s = Math.max(0, Math.floor(Number.isFinite(totalSeconds) ? totalSeconds : 0));

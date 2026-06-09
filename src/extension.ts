@@ -4,7 +4,7 @@ import { join } from "node:path";
 import pasteHtml from "../ui/paste.html";
 import trimHtml from "../ui/trim.html";
 
-import { parseMediaUrl, resolveTrackHandle, selectionStartBeats, secondsToBeats, sanitizeFilename, escapeHtml, fillTemplate, secondsToClock } from "./util.ts";
+import { parseMediaUrl, resolveTrackHandle, selectionStartBeats, secondsToBeats, detectBpm, detectKey, sanitizeFilename, escapeHtml, fillTemplate, secondsToClock } from "./util.ts";
 import * as media from "./media.ts";
 
 type Ctx = ExtensionContext<"1.0.0">;
@@ -49,6 +49,7 @@ async function showTrim(
   info: media.VideoInfo,
   audioDataUri: string,
   startSeconds: number,
+  detected: { bpm: number; phase: number; key: string },
 ): Promise<TrimResult | null> {
   const html = fillTemplate(trimHtml, {
     TITLE: escapeHtml(info.title),
@@ -58,6 +59,9 @@ async function showTrim(
     START_SEC: String(startSeconds),
     NAME: escapeHtml(sanitizeFilename(info.title)),
     AUDIO_SRC: audioDataUri,
+    BPM: String(detected.bpm),
+    PHASE: String(detected.phase),
+    KEY: escapeHtml(detected.key),
   });
   // Use a data: URL — the same transport as the paste window, whose close_and_send works.
   const url = "data:text/html," + encodeURIComponent(html);
@@ -78,8 +82,11 @@ async function importClip(
   tempDir: string,
   r: TrimResult,
   dropBeats: number,
+  key: string,
 ): Promise<void> {
-  const wavPath = join(tempDir, `${sanitizeFilename(r.name)}.wav`);
+  // Tag the clip name with the detected key (e.g. "vocal-loop-amin") when we have one.
+  const clipName = key ? `${r.name}-${key}` : r.name;
+  const wavPath = join(tempDir, `${sanitizeFilename(clipName)}.wav`);
   await media.trimToWav(fullPath, wavPath, r.start, r.end, r.sampleRate);
   const imported = await ctx.resources.importIntoProject(wavPath);
   // Live now has its own copy in the project — our temp WAV is no longer needed.
@@ -109,7 +116,7 @@ async function importClip(
     };
   }
   const clip = await track.createAudioClip(clipArgs);
-  clip.name = r.name;
+  clip.name = clipName;
 }
 
 export function activate(activation: ActivationContext) {
@@ -170,22 +177,39 @@ async function runYoink(context: Ctx, handle: Handle, dropBeats: number): Promis
           const info = await media.fetchInfo(parsed.url);
           await update(`grabbing audio… (${secondsToClock(info.duration)})`, 40);
           const fullPath = await media.downloadAudio(parsed.url, join(tempDir, "yoink-%(id)s.%(ext)s"));
-          await update("almost there…", 80);
+          await update("almost there…", 75);
           const previewPath = join(tempDir, "yoink-preview.mp3");
           await media.makePreview(fullPath, previewPath);
           const audioDataUri = await media.fileToDataUri(previewPath);
-          return { info, fullPath, previewPath, audioDataUri };
+          // Best-effort tempo/key detection off the preview PCM (empty array on failure).
+          await update("finding the groove…", 90);
+          const pcm = await media.extractPcm(previewPath, join(tempDir, "yoink-analysis.pcm"));
+          const { bpm, phase } = detectBpm(pcm, media.PCM_SAMPLE_RATE);
+          const key = detectKey(pcm, media.PCM_SAMPLE_RATE);
+          return { info, fullPath, previewPath, audioDataUri, bpm, phase, key };
         },
-      )) as { info: media.VideoInfo; fullPath: string; previewPath: string; audioDataUri: string };
+      )) as {
+        info: media.VideoInfo;
+        fullPath: string;
+        previewPath: string;
+        audioDataUri: string;
+        bpm: number;
+        phase: number;
+        key: string;
+      };
 
-      const trim = await showTrim(context, result.info, result.audioDataUri, parsed.startSeconds ?? 0);
+      const trim = await showTrim(context, result.info, result.audioDataUri, parsed.startSeconds ?? 0, {
+        bpm: result.bpm,
+        phase: result.phase,
+        key: result.key,
+      });
       if (!trim) {
         // Cancelled — still tidy up the temp download + preview.
         await media.removeFiles([result.fullPath, result.previewPath]);
         return;
       }
 
-      await importClip(context, handle, result.fullPath, tempDir, trim, dropBeats);
+      await importClip(context, handle, result.fullPath, tempDir, trim, dropBeats, result.key);
       // Drop succeeded; the sample lives in the project now. Remove the full download + preview.
       await media.removeFiles([result.fullPath, result.previewPath]);
       return; // done ♡
