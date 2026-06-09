@@ -4,7 +4,7 @@ import { join } from "node:path";
 import pasteHtml from "../ui/paste.html";
 import trimHtml from "../ui/trim.html";
 
-import { parseYouTubeUrl, sanitizeFilename, escapeHtml, fillTemplate, secondsToClock } from "./util.ts";
+import { parseMediaUrl, sanitizeFilename, escapeHtml, fillTemplate, secondsToClock } from "./util.ts";
 import * as media from "./media.ts";
 
 type Ctx = ExtensionContext<"1.0.0">;
@@ -113,25 +113,22 @@ async function runYoink(context: Ctx, handle: Handle): Promise<void> {
   for (;;) {
     const url = await showPaste(context, prefill, errorMsg);
     if (!url) return; // cancelled
-    const parsed = parseYouTubeUrl(url);
+    const parsed = parseMediaUrl(url);
     if (!parsed) {
       prefill = url;
-      errorMsg = "that doesn't look like a youtube link 🤔";
+      errorMsg = "that doesn't look like a link 🤔";
       continue;
     }
 
-    // Canonicalize to just the video — strips &list=…(mix), &t=…, and other params
-    // that can make yt-dlp resolve to the wrong track.
-    const cleanUrl = `https://www.youtube.com/watch?v=${parsed.videoId}`;
-
+    // yt-dlp auto-detects the platform from the URL — pass it through unchanged.
     try {
       const result = (await context.ui.withinProgressDialog(
         "looking it up…",
         { progress: 0 },
         async (update) => {
-          const info = await media.fetchInfo(cleanUrl);
+          const info = await media.fetchInfo(parsed.url);
           await update(`grabbing audio… (${secondsToClock(info.duration)})`, 40);
-          const fullPath = await media.downloadAudio(cleanUrl, join(tempDir, `yoink-${parsed.videoId}.%(ext)s`));
+          const fullPath = await media.downloadAudio(parsed.url, join(tempDir, "yoink-%(id)s.%(ext)s"));
           await update("almost there…", 80);
           const previewPath = join(tempDir, "yoink-preview.mp3");
           await media.makePreview(fullPath, previewPath);
