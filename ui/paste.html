@@ -65,6 +65,12 @@
         color: #4a6fa5;
         margin-bottom: 3px;
       }
+      .caption {
+        font-size: 10px;
+        color: #6f86b0;
+        margin-top: 5px;
+        letter-spacing: 0.3px;
+      }
       .url {
         width: 100%;
         box-sizing: border-box;
@@ -108,15 +114,16 @@
     </style>
   </head>
   <body>
-    <div class="tbar"><span>Yoink youtube links ♡</span><span>_ ▢ ✕</span></div>
+    <div class="tbar"><span>Yoink links ♡</span><span>_ ▢ ✕</span></div>
     <div class="mbar">
       <span><u>F</u>ile</span><span><u>E</u>dit</span><span><u>H</u>elp</span
       ><span class="sig">Developed by gudimbz ♡</span>
     </div>
     <div class="body">
       <div class="err" id="err" style="display: none">__ERROR__</div>
-      <div class="lbl">PASTE A YOUTUBE LINK</div>
-      <input class="url" id="url" value="__URL__" placeholder="https://youtube.com/watch?v=…" autofocus />
+      <div class="lbl">PASTE A LINK</div>
+      <input class="url" id="url" value="__URL__" placeholder="paste any link…" autofocus />
+      <div class="caption">youtube · tiktok · instagram · soundcloud · …</div>
       <div class="row">
         <button class="go" onclick="load()">load ♪</button>
         <button class="cancel" onclick="send('')">cancel</button>
