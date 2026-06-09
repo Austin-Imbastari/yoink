@@ -51,6 +51,7 @@ async function showTrim(
   const html = fillTemplate(trimHtml, {
     TITLE: escapeHtml(info.title),
     CHANNEL: escapeHtml(info.channel),
+    PLATFORM: escapeHtml(info.platform),
     DURATION: String(info.duration),
     START_SEC: String(startSeconds),
     NAME: escapeHtml(sanitizeFilename(info.title)),

@@ -48,6 +48,28 @@ export function parseMediaUrl(raw: string): ParsedMediaUrl | null {
   return { url: trimmed, startSeconds };
 }
 
+const PLATFORM_LABELS: Record<string, string> = {
+  youtube: "YouTube",
+  soundcloud: "SoundCloud",
+  tiktok: "TikTok",
+  instagram: "Instagram",
+  vimeo: "Vimeo",
+  bandcamp: "Bandcamp",
+  twitter: "Twitter/X",
+};
+
+/**
+ * Turn a yt-dlp extractor name (e.g. "Youtube", "soundcloud", "youtube:tab") into a tidy
+ * display label. Falls back to the raw name for sites we don't have a nice label for, and
+ * returns "" for an empty input.
+ */
+export function prettyPlatform(extractor: string): string {
+  const trimmed = extractor.trim();
+  if (!trimmed) return "";
+  const key = trimmed.toLowerCase().split(/[:_]/)[0];
+  return PLATFORM_LABELS[key] ?? trimmed;
+}
+
 /** Seconds → "m:ss" (or "h:mm:ss" past an hour). Negative/NaN clamp to 0. */
 export function secondsToClock(totalSeconds: number): string {
   const s = Math.max(0, Math.floor(Number.isFinite(totalSeconds) ? totalSeconds : 0));

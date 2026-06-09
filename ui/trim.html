@@ -108,6 +108,22 @@
         justify-content: space-between;
         margin: 0 2px 7px;
       }
+      .metaleft {
+        display: flex;
+        align-items: center;
+        gap: 7px;
+        min-width: 0;
+      }
+      .plat {
+        flex: none;
+        background: #1648c4;
+        color: #fff;
+        font-size: 11px;
+        line-height: 1.4;
+        padding: 1px 7px;
+        border-radius: 3px;
+        white-space: nowrap;
+      }
       .ctrls {
         display: flex;
         align-items: center;
@@ -195,7 +211,7 @@
     </style>
   </head>
   <body>
-    <div class="tbar"><span>Yoink youtube links ♡</span><span>_ ▢ ✕</span></div>
+    <div class="tbar"><span>Yoink any links ♡</span><span>_ ▢ ✕</span></div>
     <div class="mbar">
       <span><u>F</u>ile</span><span><u>E</u>dit</span><span><u>C</u>rate</span><span><u>H</u>elp</span
       ><span class="sig">Developed by gudimbz ♡</span>
@@ -210,7 +226,7 @@
         <div class="playhead" id="playhead"></div>
       </div>
       <div class="zoomhint">⊹ scroll to zoom · drag to pan · double-click to fit ⊹</div>
-      <div class="meta"><span id="title">__TITLE__</span><span id="totaldur"></span></div>
+      <div class="meta"><span class="metaleft"><span class="plat" id="plat">__PLATFORM__</span><span id="title">__TITLE__</span></span><span id="totaldur"></span></div>
       <div class="ctrls">
         <button class="play" id="play">▶</button>
         <div class="tg">start <input class="tin" id="start" /></div>
@@ -472,6 +488,9 @@
 
       // ---- init ----
       document.getElementById("totaldur").textContent = clock(DURATION);
+      // Hide the source badge when yt-dlp didn't give us a recognizable platform name.
+      const platEl = document.getElementById("plat");
+      if (platEl && !platEl.textContent.trim()) platEl.style.display = "none";
       (async () => {
         try {
           const resp = await fetch(audio.src);

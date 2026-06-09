@@ -3,6 +3,8 @@ import { promisify } from "node:util";
 import { readFile, rm } from "node:fs/promises";
 import { existsSync } from "node:fs";
 
+import { prettyPlatform } from "./util.ts";
+
 const run = promisify(execFile);
 const MAX_BUFFER = 64 * 1024 * 1024;
 
@@ -45,6 +47,7 @@ export interface VideoInfo {
   channel: string;
   duration: number; // seconds
   thumbnailUrl: string;
+  platform: string; // tidy label for the source site, e.g. "YouTube", "SoundCloud"
 }
 
 // ---- pure arg builders (unit-tested) ----
@@ -104,6 +107,7 @@ export async function fetchInfo(url: string): Promise<VideoInfo> {
     channel: (j.channel as string) ?? (j.uploader as string) ?? "",
     duration: Number(j.duration ?? 0),
     thumbnailUrl: (j.thumbnail as string) ?? "",
+    platform: prettyPlatform((j.extractor_key as string) ?? (j.extractor as string) ?? ""),
   };
 }
 

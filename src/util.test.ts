@@ -1,6 +1,25 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { parseMediaUrl, secondsToClock, clockToSeconds, sanitizeFilename, escapeHtml, fillTemplate } from "./util.ts";
+import { parseMediaUrl, prettyPlatform, secondsToClock, clockToSeconds, sanitizeFilename, escapeHtml, fillTemplate } from "./util.ts";
+
+test("prettyPlatform: maps known extractor keys to tidy labels", () => {
+  assert.equal(prettyPlatform("Youtube"), "YouTube");
+  assert.equal(prettyPlatform("soundcloud"), "SoundCloud");
+  assert.equal(prettyPlatform("TikTok"), "TikTok");
+  assert.equal(prettyPlatform("Instagram"), "Instagram");
+});
+
+test("prettyPlatform: strips sub-extractor suffix (youtube:tab)", () => {
+  assert.equal(prettyPlatform("youtube:tab"), "YouTube");
+});
+
+test("prettyPlatform: unknown key falls back to the raw name", () => {
+  assert.equal(prettyPlatform("SomeNewSite"), "SomeNewSite");
+});
+
+test("prettyPlatform: empty stays empty", () => {
+  assert.equal(prettyPlatform(""), "");
+});
 
 test("parseMediaUrl: standard youtube watch url is returned verbatim", () => {
   assert.deepEqual(parseMediaUrl("https://www.youtube.com/watch?v=dQw4w9WgXcQ"), {
