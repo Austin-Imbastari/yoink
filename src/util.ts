@@ -1,5 +1,5 @@
-export interface ParsedYouTubeUrl {
-  videoId: string;
+export interface ParsedMediaUrl {
+  url: string;
   startSeconds: number | null;
 }
 
@@ -21,16 +21,17 @@ function safeDecode(s: string): string {
 }
 
 /**
- * Validate a YouTube URL and extract its video id + optional start time. Returns null if not YouTube.
+ * Validate that `raw` is an http(s) URL and extract an optional start time. Returns the
+ * trimmed URL unchanged so it can be handed straight to yt-dlp, which auto-detects the
+ * platform — there is no host allowlist. Returns null if `raw` is not an http(s) URL.
  *
- * Parsed by hand rather than via `new URL(...)`: Ableton's embedded Extension Host runtime does
- * not reliably expose the `URL` global, so relying on it made every link fail with a catch→null.
+ * Parsed by hand rather than via `new URL(...)`: Ableton's embedded Extension Host runtime
+ * does not reliably expose the `URL` global, so relying on it made every link fail.
  */
-export function parseYouTubeUrl(raw: string): ParsedYouTubeUrl | null {
-  const m = raw.trim().match(/^https?:\/\/([^/?#]+)([^?#]*)(?:\?([^#]*))?/i);
+export function parseMediaUrl(raw: string): ParsedMediaUrl | null {
+  const trimmed = raw.trim();
+  const m = trimmed.match(/^https?:\/\/([^/?#]+)([^?#]*)(?:\?([^#]*))?/i);
   if (!m) return null;
-  const host = m[1].toLowerCase().replace(/^www\./, "");
-  const path = m[2] || "";
   const query = m[3] || "";
 
   const params = new Map<string, string>();
@@ -43,16 +44,8 @@ export function parseYouTubeUrl(raw: string): ParsedYouTubeUrl | null {
     if (!params.has(decodedKey)) params.set(decodedKey, safeDecode(val));
   }
 
-  let videoId: string | null = null;
-  if (host === "youtu.be") {
-    videoId = path.replace(/^\//, "").split("/")[0] || null;
-  } else if (host === "youtube.com" || host === "m.youtube.com" || host === "music.youtube.com") {
-    if (path === "/watch") videoId = params.get("v") ?? null;
-    else if (path.startsWith("/shorts/")) videoId = path.split("/")[2] ?? null;
-  }
-  if (!videoId || !/^[\w-]{6,}$/.test(videoId)) return null;
   const startSeconds = parseTimeParam(params.get("t") ?? params.get("start") ?? null);
-  return { videoId, startSeconds };
+  return { url: trimmed, startSeconds };
 }
 
 /** Seconds → "m:ss" (or "h:mm:ss" past an hour). Negative/NaN clamp to 0. */

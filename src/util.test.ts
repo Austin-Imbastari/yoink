@@ -1,45 +1,68 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { parseYouTubeUrl, secondsToClock, clockToSeconds, sanitizeFilename, escapeHtml, fillTemplate } from "./util.ts";
+import { parseMediaUrl, secondsToClock, clockToSeconds, sanitizeFilename, escapeHtml, fillTemplate } from "./util.ts";
 
-test("parseYouTubeUrl: standard watch url", () => {
-  assert.deepEqual(parseYouTubeUrl("https://www.youtube.com/watch?v=dQw4w9WgXcQ"), {
-    videoId: "dQw4w9WgXcQ",
+test("parseMediaUrl: standard youtube watch url is returned verbatim", () => {
+  assert.deepEqual(parseMediaUrl("https://www.youtube.com/watch?v=dQw4w9WgXcQ"), {
+    url: "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
     startSeconds: null,
   });
 });
 
-test("parseYouTubeUrl: youtu.be short url with numeric t", () => {
-  assert.deepEqual(parseYouTubeUrl("https://youtu.be/dQw4w9WgXcQ?t=92"), {
-    videoId: "dQw4w9WgXcQ",
+test("parseMediaUrl: youtu.be short url with numeric t", () => {
+  assert.deepEqual(parseMediaUrl("https://youtu.be/dQw4w9WgXcQ?t=92"), {
+    url: "https://youtu.be/dQw4w9WgXcQ?t=92",
     startSeconds: 92,
   });
 });
 
-test("parseYouTubeUrl: t with 1m30s format", () => {
-  assert.deepEqual(parseYouTubeUrl("https://www.youtube.com/watch?v=dQw4w9WgXcQ&t=1m30s"), {
-    videoId: "dQw4w9WgXcQ",
-    startSeconds: 90,
+test("parseMediaUrl: t with 1m30s format", () => {
+  assert.equal(parseMediaUrl("https://www.youtube.com/watch?v=dQw4w9WgXcQ&t=1m30s")?.startSeconds, 90);
+});
+
+test("parseMediaUrl: t with trailing s", () => {
+  assert.equal(parseMediaUrl("https://youtu.be/abcdefghijk?t=45s")?.startSeconds, 45);
+});
+
+test("parseMediaUrl: tiktok url accepted, no timestamp", () => {
+  assert.deepEqual(parseMediaUrl("https://www.tiktok.com/@user/video/7234567890123456789"), {
+    url: "https://www.tiktok.com/@user/video/7234567890123456789",
+    startSeconds: null,
   });
 });
 
-test("parseYouTubeUrl: t with trailing s", () => {
-  assert.equal(parseYouTubeUrl("https://youtu.be/abcdefghijk?t=45s")?.startSeconds, 45);
-});
-
-test("parseYouTubeUrl: watch url with radio-mix &list= keeps the v= id", () => {
+test("parseMediaUrl: instagram reel accepted", () => {
   assert.equal(
-    parseYouTubeUrl("https://www.youtube.com/watch?v=5Sp1Xkay52E&list=RD5Sp1Xkay52E")?.videoId,
-    "5Sp1Xkay52E",
+    parseMediaUrl("https://www.instagram.com/reel/CabcdEfghIj/")?.url,
+    "https://www.instagram.com/reel/CabcdEfghIj/",
   );
 });
 
-test("parseYouTubeUrl: non-youtube url returns null", () => {
-  assert.equal(parseYouTubeUrl("https://example.com/watch?v=x"), null);
+test("parseMediaUrl: soundcloud track accepted", () => {
+  assert.deepEqual(parseMediaUrl("https://soundcloud.com/artist/some-track"), {
+    url: "https://soundcloud.com/artist/some-track",
+    startSeconds: null,
+  });
 });
 
-test("parseYouTubeUrl: garbage returns null", () => {
-  assert.equal(parseYouTubeUrl("not a url"), null);
+test("parseMediaUrl: trims surrounding whitespace", () => {
+  assert.equal(parseMediaUrl("  https://soundcloud.com/a/b  ")?.url, "https://soundcloud.com/a/b");
+});
+
+test("parseMediaUrl: plain text returns null", () => {
+  assert.equal(parseMediaUrl("not a url"), null);
+});
+
+test("parseMediaUrl: empty string returns null", () => {
+  assert.equal(parseMediaUrl(""), null);
+});
+
+test("parseMediaUrl: non-http scheme returns null", () => {
+  assert.equal(parseMediaUrl("ftp://example.com/x"), null);
+});
+
+test("parseMediaUrl: bare domain without scheme returns null", () => {
+  assert.equal(parseMediaUrl("soundcloud.com/artist/track"), null);
 });
 
 test("secondsToClock: under a minute pads seconds", () => {
