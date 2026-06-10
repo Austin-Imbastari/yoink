@@ -415,10 +415,18 @@
       function drawGrid(ctx, w, h) {
         if (bpm <= 0) return;
         const beatSec = 60 / bpm;
+        // Pixels per beat at the current zoom. When lines get too close they'd merge into a
+        // solid wash and hide the waveform, so only draw beats/bars that are far enough apart.
+        const beatPx = (beatSec / span()) * w;
+        const MIN_PX = 6;
+        const drawBeats = beatPx >= MIN_PX;
+        const drawBars = beatPx * 4 >= MIN_PX;
+        if (!drawBeats && !drawBars) return;
         let n = Math.ceil((viewStart - phase) / beatSec);
         for (let t = phase + n * beatSec; t <= viewEnd; t += beatSec, n++) {
-          const x = Math.round(timeToX(t)) + 0.5;
           const isBar = ((n % 4) + 4) % 4 === 0;
+          if (isBar ? !drawBars : !drawBeats) continue;
+          const x = Math.round(timeToX(t)) + 0.5;
           ctx.strokeStyle = isBar ? "rgba(22,72,196,0.55)" : "rgba(22,72,196,0.2)";
           ctx.lineWidth = isBar ? 1.5 : 1;
           ctx.beginPath();
