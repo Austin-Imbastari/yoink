@@ -253,13 +253,24 @@
       .chk {
         display: flex;
         align-items: center;
-        gap: 5px;
+        gap: 6px;
         cursor: pointer;
         user-select: none;
+        padding: 3px 10px;
+        border: 1px solid #aca899;
+        border-radius: 4px;
+        background: #fff;
+      }
+      .chk.on {
+        background: #1648c4;
+        color: #fff;
+        border-color: #0f3fb5;
       }
       .chk input {
         margin: 0;
         cursor: pointer;
+        width: 15px;
+        height: 15px;
       }
       .footer {
         display: flex;
@@ -354,14 +365,23 @@
       const endIn = document.getElementById("end");
       const warpEl = document.getElementById("warp");
       const loopEl = document.getElementById("loop");
+      // Reflect each checkbox's state on its label (filled blue when on) so it's obvious the
+      // click registered — coupling sets a box programmatically, so sync both explicitly.
+      function syncChkStyles() {
+        warpEl.closest(".chk").classList.toggle("on", warpEl.checked);
+        loopEl.closest(".chk").classList.toggle("on", loopEl.checked);
+      }
       // Live only loops warped clips, so keep the two checkboxes in a legal state:
       // ticking loop forces warp on; un-ticking warp forces loop off.
       loopEl.addEventListener("change", () => {
         if (loopEl.checked) warpEl.checked = true;
+        syncChkStyles();
       });
       warpEl.addEventListener("change", () => {
         if (!warpEl.checked) loopEl.checked = false;
+        syncChkStyles();
       });
+      syncChkStyles();
 
       // ---- view window (zoom / pan) ----
       let viewStart = 0,
