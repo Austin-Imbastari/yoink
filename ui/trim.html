@@ -69,21 +69,34 @@
         border-left: 3px solid #1648c4;
         border-right: 3px solid #1648c4;
       }
+      /* Full-height grab bars sitting just INSIDE each edge so they're never clipped at the
+         track ends; a contrasting white border + grip dashes make them easy to see and grab. */
       .handle {
         position: absolute;
-        top: 50%;
-        width: 11px;
-        height: 30px;
-        margin-top: -15px;
+        top: 0;
+        bottom: 0;
+        width: 14px;
         background: #1648c4;
-        border-radius: 3px;
+        border: 1px solid #fff;
+        box-shadow: 0 0 4px rgba(0, 0, 0, 0.4);
         cursor: ew-resize;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+      .handle::before {
+        content: "⋮";
+        color: #fff;
+        font-size: 16px;
+        line-height: 1;
       }
       .handle.l {
-        left: -7px;
+        left: 0;
+        border-radius: 3px 0 0 3px;
       }
       .handle.r {
-        right: -7px;
+        right: 0;
+        border-radius: 0 3px 3px 0;
       }
       .playhead {
         position: absolute;
