@@ -65,38 +65,51 @@
         position: absolute;
         top: 0;
         bottom: 0;
-        background: rgba(40, 110, 230, 0.18);
-        border-left: 3px solid #1648c4;
-        border-right: 3px solid #1648c4;
+        background: rgba(23, 196, 186, 0.13);
       }
-      /* Full-height grab bars sitting just INSIDE each edge so they're never clipped at the
-         track ends; a contrasting white border + grip dashes make them easy to see and grab. */
+      /* Thin teal loop markers with a flag at the top (Ableton-style). The element itself is a
+         wider transparent grab zone so the thin line stays easy to grab. */
       .handle {
         position: absolute;
         top: 0;
         bottom: 0;
-        width: 14px;
-        background: #1648c4;
-        border: 1px solid #fff;
-        box-shadow: 0 0 4px rgba(0, 0, 0, 0.4);
+        width: 16px;
+        background: transparent;
         cursor: ew-resize;
-        display: flex;
-        align-items: center;
-        justify-content: center;
+      }
+      .handle::after {
+        content: "";
+        position: absolute;
+        top: 0;
+        bottom: 0;
+        width: 2px;
+        background: #15c4ba;
       }
       .handle::before {
-        content: "⋮";
-        color: #fff;
-        font-size: 16px;
-        line-height: 1;
+        content: "";
+        position: absolute;
+        top: 0;
+        border-top: 8px solid #15c4ba;
+        border-left: 6px solid transparent;
+        border-right: 6px solid transparent;
       }
       .handle.l {
-        left: 0;
-        border-radius: 3px 0 0 3px;
+        left: -8px;
+      }
+      .handle.l::after {
+        left: 7px;
+      }
+      .handle.l::before {
+        left: 1px;
       }
       .handle.r {
-        right: 0;
-        border-radius: 0 3px 3px 0;
+        right: -8px;
+      }
+      .handle.r::after {
+        right: 7px;
+      }
+      .handle.r::before {
+        right: 1px;
       }
       .playhead {
         position: absolute;
@@ -253,24 +266,13 @@
       .chk {
         display: flex;
         align-items: center;
-        gap: 6px;
+        gap: 5px;
         cursor: pointer;
         user-select: none;
-        padding: 3px 10px;
-        border: 1px solid #aca899;
-        border-radius: 4px;
-        background: #fff;
-      }
-      .chk.on {
-        background: #1648c4;
-        color: #fff;
-        border-color: #0f3fb5;
       }
       .chk input {
         margin: 0;
         cursor: pointer;
-        width: 15px;
-        height: 15px;
       }
       .footer {
         display: flex;
@@ -365,23 +367,14 @@
       const endIn = document.getElementById("end");
       const warpEl = document.getElementById("warp");
       const loopEl = document.getElementById("loop");
-      // Reflect each checkbox's state on its label (filled blue when on) so it's obvious the
-      // click registered — coupling sets a box programmatically, so sync both explicitly.
-      function syncChkStyles() {
-        warpEl.closest(".chk").classList.toggle("on", warpEl.checked);
-        loopEl.closest(".chk").classList.toggle("on", loopEl.checked);
-      }
       // Live only loops warped clips, so keep the two checkboxes in a legal state:
       // ticking loop forces warp on; un-ticking warp forces loop off.
       loopEl.addEventListener("change", () => {
         if (loopEl.checked) warpEl.checked = true;
-        syncChkStyles();
       });
       warpEl.addEventListener("change", () => {
         if (!warpEl.checked) loopEl.checked = false;
-        syncChkStyles();
       });
-      syncChkStyles();
 
       // ---- view window (zoom / pan) ----
       let viewStart = 0,
