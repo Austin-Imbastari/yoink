@@ -1,10 +1,27 @@
-import { initialize, AudioTrack, type ActivationContext, type Handle, type ExtensionContext } from "@ableton-extensions/sdk";
+import {
+  initialize,
+  AudioTrack,
+  type ActivationContext,
+  type Handle,
+  type ExtensionContext,
+} from "@ableton-extensions/sdk";
 import { join } from "node:path";
 
 import pasteHtml from "../ui/paste.html";
 import trimHtml from "../ui/trim.html";
 
-import { parseMediaUrl, resolveTrackHandle, selectionStartBeats, secondsToBeats, detectBpm, detectKey, sanitizeFilename, escapeHtml, fillTemplate, secondsToClock } from "./util.ts";
+import {
+  parseMediaUrl,
+  resolveTrackHandle,
+  selectionStartBeats,
+  secondsToBeats,
+  detectBpm,
+  detectKey,
+  sanitizeFilename,
+  escapeHtml,
+  fillTemplate,
+  secondsToClock,
+} from "./util.ts";
 import * as media from "./media.ts";
 
 type Ctx = ExtensionContext<"1.0.0">;
@@ -32,7 +49,7 @@ function errDetail(e: unknown): string {
 
 function friendlyError(e: unknown): string {
   const msg = String((e as Error)?.message ?? e);
-  if (/ENOENT|not found|spawn/.test(msg)) return "can't find yt-dlp / ffmpeg 🔧";
+  if (/ENOENT|not found|spawn/.test(msg)) return "can't find yt-dlp / ffmpeg 🔧 please install it!";
   if (/yt-dlp/i.test(msg)) return "couldn't reach that one 😿 (is it private / unavailable?)";
   if (/ffmpeg/i.test(msg)) return "something glitched converting 💔";
   return "hmm, that didn't work 😿 — try another link";
@@ -92,9 +109,7 @@ async function importClip(
   // Live now has its own copy in the project — our temp WAV is no longer needed.
   await media.removeFiles([wavPath]);
   const track =
-    r.target === "new"
-      ? await ctx.application.song.createAudioTrack()
-      : ctx.getObjectFromHandle(handle, AudioTrack);
+    r.target === "new" ? await ctx.application.song.createAudioTrack() : ctx.getObjectFromHandle(handle, AudioTrack);
 
   // Looping requires a warped clip (SDK constraint), so loop forces warp on.
   const isWarped = r.warp || r.loop;
@@ -170,25 +185,21 @@ async function runYoink(context: Ctx, handle: Handle, dropBeats: number): Promis
 
     // yt-dlp auto-detects the platform from the URL — pass it through unchanged.
     try {
-      const result = (await context.ui.withinProgressDialog(
-        "looking it up…",
-        { progress: 0 },
-        async (update) => {
-          const info = await media.fetchInfo(parsed.url);
-          await update(`grabbing audio… (${secondsToClock(info.duration)})`, 40);
-          const fullPath = await media.downloadAudio(parsed.url, join(tempDir, "yoink-%(id)s.%(ext)s"));
-          await update("almost there…", 75);
-          const previewPath = join(tempDir, "yoink-preview.mp3");
-          await media.makePreview(fullPath, previewPath);
-          const audioDataUri = await media.fileToDataUri(previewPath);
-          // Best-effort tempo/key detection off the preview PCM (empty array on failure).
-          await update("finding the groove…", 90);
-          const pcm = await media.extractPcm(previewPath, join(tempDir, "yoink-analysis.pcm"));
-          const { bpm, phase } = detectBpm(pcm, media.PCM_SAMPLE_RATE);
-          const key = detectKey(pcm, media.PCM_SAMPLE_RATE);
-          return { info, fullPath, previewPath, audioDataUri, bpm, phase, key };
-        },
-      )) as {
+      const result = (await context.ui.withinProgressDialog("looking it up…", { progress: 0 }, async (update) => {
+        const info = await media.fetchInfo(parsed.url);
+        await update(`grabbing audio… (${secondsToClock(info.duration)})`, 40);
+        const fullPath = await media.downloadAudio(parsed.url, join(tempDir, "yoink-%(id)s.%(ext)s"));
+        await update("almost there…", 75);
+        const previewPath = join(tempDir, "yoink-preview.mp3");
+        await media.makePreview(fullPath, previewPath);
+        const audioDataUri = await media.fileToDataUri(previewPath);
+        // Best-effort tempo/key detection off the preview PCM (empty array on failure).
+        await update("finding the groove…", 90);
+        const pcm = await media.extractPcm(previewPath, join(tempDir, "yoink-analysis.pcm"));
+        const { bpm, phase } = detectBpm(pcm, media.PCM_SAMPLE_RATE);
+        const key = detectKey(pcm, media.PCM_SAMPLE_RATE);
+        return { info, fullPath, previewPath, audioDataUri, bpm, phase, key };
+      })) as {
         info: media.VideoInfo;
         fullPath: string;
         previewPath: string;
