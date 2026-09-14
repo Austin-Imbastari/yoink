@@ -5,7 +5,8 @@ import {
   type Handle,
   type ExtensionContext,
 } from "@ableton-extensions/sdk";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
+import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 
 import pasteHtml from "../ui/paste.html";
 import trimHtml from "../ui/trim.html";
@@ -14,17 +15,22 @@ import {
   parseMediaUrl,
   resolveTrackHandle,
   selectionStartBeats,
-  secondsToBeats,
   detectBpm,
   detectKey,
   sanitizeFilename,
   escapeHtml,
-  fillTemplate,
+  htmlDataUrl,
   secondsToClock,
+  normalizeSkin,
+  type Skin,
 } from "./util.ts";
 import * as media from "./media.ts";
 
 type Ctx = ExtensionContext<"1.0.0">;
+
+// The preview is inlined into the trim dialog as base64, so its memory grows with track length.
+// Capped here; raise it if longer sources (DJ mixes) matter more than memory.
+const MAX_MINUTES = 60;
 
 interface TrimResult {
   start: number;
@@ -34,6 +40,7 @@ interface TrimResult {
   sampleRate: number;
   warp: boolean;
   loop: boolean;
+  skin?: unknown; // skin picked in the trim window; normalized before use
 }
 
 /** Last meaningful line of a subprocess failure — stderr beats the generic "Command failed" message. */
@@ -49,40 +56,98 @@ function errDetail(e: unknown): string {
 
 function friendlyError(e: unknown): string {
   const msg = String((e as Error)?.message ?? e);
+  if (/too long/.test(msg)) return `that one's over ${MAX_MINUTES} min 😿 — try a shorter link`;
   if (/ENOENT|not found|spawn/.test(msg)) return "can't find yt-dlp / ffmpeg 🔧 please install it!";
   if (/yt-dlp/i.test(msg)) return "couldn't reach that one 😿 (is it private / unavailable?)";
   if (/ffmpeg/i.test(msg)) return "something glitched converting 💔";
   return "hmm, that didn't work 😿 — try another link";
 }
 
-async function showPaste(ctx: Ctx, prefillUrl: string, errorMsg: string): Promise<string> {
-  const html = fillTemplate(pasteHtml, { URL: escapeHtml(prefillUrl), ERROR: escapeHtml(errorMsg) });
-  const url = "data:text/html," + encodeURIComponent(html);
-  return ctx.ui.showModalDialog(url, 380, 230);
+// ---- skin: picked from either window's Skin menu, remembered in the extension's storage dir ----
+let currentSkin: Skin = "luna";
+
+function settingsPath(ctx: Ctx): string | null {
+  const dir = ctx.environment.storageDirectory;
+  return dir ? join(dir, "settings.json") : null;
 }
 
-async function showTrim(
-  ctx: Ctx,
+async function loadSkin(ctx: Ctx): Promise<void> {
+  const path = settingsPath(ctx);
+  if (!path) return;
+  try {
+    currentSkin = normalizeSkin(JSON.parse(await readFile(path, "utf8")).skin);
+  } catch {
+    // first run, or an unreadable file: keep the current skin
+  }
+}
+
+/** Dialogs report their skin in the result; persist it when it changed. */
+async function saveSkin(ctx: Ctx, picked: unknown): Promise<void> {
+  const next = normalizeSkin(picked);
+  if (next === currentSkin) return;
+  currentSkin = next;
+  const path = settingsPath(ctx);
+  if (!path) return; // no storage dir: remembered for this session only
+  try {
+    await mkdir(dirname(path), { recursive: true });
+    await writeFile(path, JSON.stringify({ skin: next }));
+  } catch (e) {
+    console.log("[yoink] could not save skin:", errDetail(e));
+  }
+}
+
+/** The pasted URL ("" when cancelled) and the skin the window ended on. */
+async function showPaste(ctx: Ctx, prefillUrl: string, errorMsg: string): Promise<{ url: string; skin: unknown }> {
+  const page = htmlDataUrl(pasteHtml, {
+    URL: escapeHtml(prefillUrl),
+    ERROR: escapeHtml(errorMsg),
+    SKIN: currentSkin,
+  });
+  const raw = await ctx.ui.showModalDialog(page, 440, 285);
+  try {
+    const r = JSON.parse(raw) as { url?: unknown; skin?: unknown };
+    return { url: typeof r.url === "string" ? r.url : "", skin: r.skin };
+  } catch {
+    return { url: "", skin: currentSkin }; // closed with the window's own ✕: a cancel
+  }
+}
+
+/**
+ * Build the trim dialog's data: URL. The preview and peaks go in as raw base64 (no
+ * percent-encoding copy), and the preview's base64 string is garbage once this returns.
+ */
+async function trimPageUrl(
   info: media.VideoInfo,
-  audioDataUri: string,
+  previewPath: string,
+  analysis: media.AudioAnalysis,
   startSeconds: number,
   detected: { bpm: number; phase: number; key: string },
-): Promise<TrimResult | null> {
-  const html = fillTemplate(trimHtml, {
-    TITLE: escapeHtml(info.title),
-    CHANNEL: escapeHtml(info.channel),
-    PLATFORM: escapeHtml(info.platform),
-    DURATION: String(info.duration),
-    START_SEC: String(startSeconds),
-    NAME: escapeHtml(sanitizeFilename(info.title)),
-    AUDIO_SRC: audioDataUri,
-    BPM: String(detected.bpm),
-    PHASE: String(detected.phase),
-    KEY: escapeHtml(detected.key),
-  });
-  // Use a data: URL — the same transport as the paste window, whose close_and_send works.
-  const url = "data:text/html," + encodeURIComponent(html);
-  const raw = await ctx.ui.showModalDialog(url, 410, 580);
+): Promise<string> {
+  const p = analysis.peaks;
+  return htmlDataUrl(
+    trimHtml,
+    {
+      TITLE: escapeHtml(info.title),
+      CHANNEL: escapeHtml(info.channel),
+      PLATFORM: escapeHtml(info.platform),
+      DURATION: String(analysis.seconds || info.duration),
+      START_SEC: String(startSeconds),
+      NAME: escapeHtml(sanitizeFilename(info.title)),
+      PEAK_RATE: String(analysis.peakRate),
+      BPM: String(detected.bpm),
+      PHASE: String(detected.phase),
+      KEY: escapeHtml(detected.key),
+      SKIN: currentSkin,
+    },
+    {
+      AUDIO_SRC: await media.fileToDataUri(previewPath),
+      PEAKS: Buffer.from(p.buffer, p.byteOffset, p.length).toString("base64"),
+    },
+  );
+}
+
+async function showTrim(ctx: Ctx, pageUrl: string): Promise<TrimResult | null> {
+  const raw = await ctx.ui.showModalDialog(pageUrl, 470, 590);
   if (!raw) return null;
   try {
     return JSON.parse(raw) as TrimResult;
@@ -96,42 +161,30 @@ async function importClip(
   ctx: Ctx,
   handle: Handle,
   fullPath: string,
-  tempDir: string,
+  workDir: string,
   r: TrimResult,
   dropBeats: number,
   key: string,
 ): Promise<void> {
   // Tag the clip name with the detected key (e.g. "vocal-loop-amin") when we have one.
   const clipName = key ? `${r.name}-${key}` : r.name;
-  const wavPath = join(tempDir, `${sanitizeFilename(clipName)}.wav`);
+  const wavPath = join(workDir, `${sanitizeFilename(clipName)}.wav`);
   await media.trimToWav(fullPath, wavPath, r.start, r.end, r.sampleRate);
   const imported = await ctx.resources.importIntoProject(wavPath);
-  // Live now has its own copy in the project — our temp WAV is no longer needed.
-  await media.removeFiles([wavPath]);
   const track =
     r.target === "new" ? await ctx.application.song.createAudioTrack() : ctx.getObjectFromHandle(handle, AudioTrack);
 
   // Looping requires a warped clip (SDK constraint), so loop forces warp on.
-  const isWarped = r.warp || r.loop;
-  const clipArgs: Parameters<typeof track.createAudioClip>[0] = {
+  const clip = await track.createAudioClip({
     filePath: imported,
     startTime: dropBeats, // selection start in beats, or 0 (bar 1)
-    isWarped,
-  };
-  if (r.loop) {
-    // Loop the whole trimmed region. Markers are in beats, so convert the selection's
-    // real-time length using the Set tempo.
-    const lengthBeats = secondsToBeats(r.end - r.start, ctx.application.song.tempo);
-    clipArgs.loopSettings = {
-      looping: true,
-      startMarker: 0,
-      endMarker: lengthBeats,
-      loopStart: 0,
-      loopEnd: lengthBeats,
-    };
-  }
-  const clip = await track.createAudioClip(clipArgs);
+    isWarped: r.warp || r.loop,
+  });
   clip.name = clipName;
+  // Turn looping on after creation so Live sizes the loop from its own warp of the file.
+  // Beat markers computed from the Set tempo looped short/long whenever the sample's
+  // tempo differed from the Set's.
+  if (r.loop) clip.looping = true;
 }
 
 export function activate(activation: ActivationContext) {
@@ -172,9 +225,12 @@ async function runYoink(context: Ctx, handle: Handle, dropBeats: number): Promis
   let prefill = "";
 
   let errorMsg = "";
+  await loadSkin(context);
   // Retry loop: paste → download → trim → import. Errors loop back to the paste window.
   for (;;) {
-    const url = await showPaste(context, prefill, errorMsg);
+    const pasted = await showPaste(context, prefill, errorMsg);
+    await saveSkin(context, pasted.skin);
+    const url = pasted.url;
     if (!url) return; // cancelled
     const parsed = parseMediaUrl(url);
     if (!parsed) {
@@ -183,52 +239,76 @@ async function runYoink(context: Ctx, handle: Handle, dropBeats: number): Promis
       continue;
     }
 
-    // yt-dlp auto-detects the platform from the URL — pass it through unchanged.
+    // One private dir per attempt: concurrent Yoink windows can't clobber each other's files, and
+    // `finally` removes everything (download, preview, WAV) on success, cancel, and error alike.
+    const workDir = await mkdtemp(join(tempDir, "yoink-"));
     try {
-      const result = (await context.ui.withinProgressDialog("looking it up…", { progress: 0 }, async (update) => {
-        const info = await media.fetchInfo(parsed.url);
-        await update(`grabbing audio… (${secondsToClock(info.duration)})`, 40);
-        const fullPath = await media.downloadAudio(parsed.url, join(tempDir, "yoink-%(id)s.%(ext)s"));
-        await update("almost there…", 75);
-        const previewPath = join(tempDir, "yoink-preview.mp3");
-        await media.makePreview(fullPath, previewPath);
-        const audioDataUri = await media.fileToDataUri(previewPath);
-        // Best-effort tempo/key detection off the preview PCM (empty array on failure).
-        await update("finding the groove…", 90);
-        const pcm = await media.extractPcm(previewPath, join(tempDir, "yoink-analysis.pcm"));
-        const { bpm, phase } = detectBpm(pcm, media.PCM_SAMPLE_RATE);
-        const key = detectKey(pcm, media.PCM_SAMPLE_RATE);
-        return { info, fullPath, previewPath, audioDataUri, bpm, phase, key };
-      })) as {
-        info: media.VideoInfo;
-        fullPath: string;
-        previewPath: string;
-        audioDataUri: string;
-        bpm: number;
-        phase: number;
-        key: string;
-      };
+      // yt-dlp auto-detects the platform from the URL — pass it through unchanged.
+      const { fullPath, key, pageUrl } = (await context.ui.withinProgressDialog(
+        "looking it up…",
+        { progress: 0 },
+        async (update, signal) => {
+          const info = await media.fetchInfo(parsed.url);
+          if (info.duration > MAX_MINUTES * 60) throw new Error("too long");
+          const length = secondsToClock(info.duration);
+          await update(`grabbing audio… 0% (${length})`, 10);
+          // The download is the slow part: map its real 0–100% onto 10–75% of the bar, and only
+          // message Live when the whole percent changes (yt-dlp can report many times a second).
+          let shownPct = 0;
+          const fullPath = await media.downloadAudio(
+            parsed.url,
+            join(workDir, "src.%(ext)s"),
+            (fraction) => {
+              const pct = Math.floor(fraction * 100);
+              if (pct === shownPct) return;
+              shownPct = pct;
+              update(`grabbing audio… ${pct}% (${length})`, Math.round(10 + fraction * 65)).catch(() => {});
+            },
+            signal,
+          );
+          await update("finding the groove…", 75);
 
-      const trim = await showTrim(context, result.info, result.audioDataUri, parsed.startSeconds ?? 0, {
-        bpm: result.bpm,
-        phase: result.phase,
-        key: result.key,
-      });
-      if (!trim) {
-        // Cancelled — still tidy up the temp download + preview.
-        await media.removeFiles([result.fullPath, result.previewPath]);
-        return;
-      }
+          // Analyze around the link's timestamp if it has one, else mid-track (intros are often beatless).
+          const want = parsed.startSeconds ?? info.duration / 2 - media.ANALYSIS_SEC / 2;
+          const winStart = Math.max(0, Math.min(want, info.duration - media.ANALYSIS_SEC));
+          const previewPath = join(workDir, "preview.mp3");
+          // Two independent ffmpeg jobs — run them side by side.
+          const [, analysis] = await Promise.all([
+            media.makePreview(fullPath, previewPath),
+            media.analyzeAudio(fullPath, info.duration, winStart),
+          ]);
+          signal.throwIfAborted(); // cancelled during analysis: don't open the trim window
+          // Best-effort tempo/key detection (bpm 0 / "" when it can't tell).
+          const { bpm, phase } = detectBpm(analysis.window, media.PCM_SAMPLE_RATE);
+          const key = detectKey(analysis.window, media.PCM_SAMPLE_RATE);
+          // detectBpm's phase is relative to the window; shift it to the track start.
+          const beatSec = bpm > 0 ? 60 / bpm : 0;
+          const trackPhase = beatSec ? (analysis.windowStartSec + phase) % beatSec : 0;
 
-      await importClip(context, handle, result.fullPath, tempDir, trim, dropBeats, result.key);
-      // Drop succeeded; the sample lives in the project now. Remove the full download + preview.
-      await media.removeFiles([result.fullPath, result.previewPath]);
+          const pageUrl = await trimPageUrl(info, previewPath, analysis, parsed.startSeconds ?? 0, {
+            bpm,
+            phase: trackPhase,
+            key,
+          });
+          return { fullPath, key, pageUrl };
+        },
+      )) as { fullPath: string; key: string; pageUrl: string };
+
+      const trim = await showTrim(context, pageUrl);
+      // Cancelled. Closing the window sends no result, so a skin picked there isn't kept.
+      if (!trim) return;
+      await saveSkin(context, trim.skin);
+
+      await importClip(context, handle, fullPath, workDir, trim, dropBeats, key);
       return; // done ♡
     } catch (e) {
+      if ((e as Error)?.name === "AbortError") return; // cancelled from the progress dialog
       console.error("[yoink] pipeline failed:", errDetail(e));
       prefill = url;
       errorMsg = friendlyError(e);
-      continue;
+    } finally {
+      // Live has its own copy of the sample by now; nothing in here is needed anymore.
+      await rm(workDir, { recursive: true, force: true }).catch(() => {});
     }
   }
 }

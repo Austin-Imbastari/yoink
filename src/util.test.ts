@@ -1,46 +1,41 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { parseMediaUrl, prettyPlatform, resolveTrackHandle, secondsToBeats, selectionStartBeats, detectBpm, goertzelMagnitude, chromaToKey, detectKey, secondsToClock, clockToSeconds, sanitizeFilename, escapeHtml, fillTemplate } from "./util.ts";
+import { parseMediaUrl, prettyPlatform, resolveTrackHandle, selectionStartBeats, detectBpm, chromaToKey, detectKey, secondsToClock, sanitizeFilename, escapeHtml, htmlDataUrl, createPcmSink, normalizeSkin } from "./util.ts";
 
-// Krumhansl–Schmuckler major/minor profiles (tonic = C), used to build fixtures.
-const KS_MAJOR = [6.35, 2.23, 3.48, 2.33, 4.38, 4.09, 2.52, 5.19, 2.39, 3.66, 2.29, 2.88];
-const KS_MINOR = [6.33, 2.68, 3.52, 5.38, 2.6, 3.53, 2.54, 4.75, 3.98, 2.69, 3.34, 3.17];
-const rotateProfile = (profile: number[], tonic: number) => profile.map((_, p) => profile[(p - tonic + 12) % 12]);
+const rotate = (profile: number[], tonic: number) => profile.map((_, p) => profile[(p - tonic + 12) % 12]);
 
-function sine(sampleRate: number, durationSec: number, freq: number) {
+/** Sum of sines at the given MIDI notes, each with its own amplitude. */
+function notes(sampleRate: number, durationSec: number, parts: [midi: number, amp: number][]) {
   const n = Math.floor(sampleRate * durationSec);
   const a = new Float32Array(n);
-  for (let i = 0; i < n; i++) a[i] = Math.sin((2 * Math.PI * freq * i) / sampleRate);
+  for (const [midi, amp] of parts) {
+    const freq = 440 * 2 ** ((midi - 69) / 12);
+    for (let i = 0; i < n; i++) a[i] += (amp * Math.sin((2 * Math.PI * freq * i) / sampleRate)) / parts.length;
+  }
   return a;
 }
 
-test("goertzelMagnitude: peaks at the signal's frequency", () => {
-  const sr = 11025;
-  const s = sine(sr, 1, 440);
-  const atTone = goertzelMagnitude(s, 440, sr);
-  const offTone = goertzelMagnitude(s, 466.16, sr); // A#4, a semitone up
-  assert.ok(atTone > offTone * 5, `440Hz (${atTone}) should dominate 466Hz (${offTone})`);
+test("chromaToKey: tonic/fifth-weighted C major scale resolves to C maj", () => {
+  assert.equal(chromaToKey([4, 0, 2, 0, 3, 2, 0, 3, 0, 2, 0, 2]), "C maj");
 });
 
-test("chromaToKey: Krumhansl major profile resolves to C maj", () => {
-  assert.equal(chromaToKey(KS_MAJOR), "C maj");
+test("chromaToKey: the same shape rotated to A resolves to A maj", () => {
+  assert.equal(chromaToKey(rotate([4, 0, 2, 0, 3, 2, 0, 3, 0, 2, 0, 2], 9)), "A maj");
 });
 
-test("chromaToKey: Krumhansl minor profile resolves to C min", () => {
-  assert.equal(chromaToKey(KS_MINOR), "C min");
+test("chromaToKey: natural-minor shape on D resolves to D min", () => {
+  assert.equal(chromaToKey(rotate([4, 0, 2, 3, 0, 2, 0, 3, 2, 0, 2, 1], 2)), "D min");
 });
 
-test("chromaToKey: a profile rotated to A resolves to A maj", () => {
-  assert.equal(chromaToKey(rotateProfile(KS_MAJOR, 9)), "A maj");
+test("detectKey: a C major scale with a loud C–E–G triad is C maj", () => {
+  // C4 E4 G4 loud; D4 F4 A4 B4 quieter.
+  const audio = notes(11025, 3, [[60, 1], [64, 1], [67, 1], [62, 0.5], [65, 0.5], [69, 0.5], [71, 0.5]]);
+  assert.equal(detectKey(audio, 11025), "C maj");
 });
 
-test("detectKey: returns a well-formed key label", () => {
-  const key = detectKey(sine(11025, 2, 440), 11025);
-  assert.match(key, /^[A-G]#? (maj|min)$/);
-});
-
-test("detectKey: empty input returns empty string", () => {
+test("detectKey: too-short or empty input returns empty string", () => {
   assert.equal(detectKey(new Float32Array(0), 11025), "");
+  assert.equal(detectKey(new Float32Array(1000), 11025), "");
 });
 
 /** A synthetic click track: a short decaying impulse on every beat at the given tempo. */
@@ -74,18 +69,6 @@ test("detectBpm: finds 90 BPM on a click track", () => {
 
 test("detectBpm: empty/too-short input returns 0 bpm", () => {
   assert.equal(detectBpm(new Float32Array(0), 11025).bpm, 0);
-});
-
-test("secondsToBeats: converts using tempo (120bpm => 2 beats/sec)", () => {
-  assert.equal(secondsToBeats(1, 120), 2);
-  assert.equal(secondsToBeats(4, 120), 8);
-  assert.equal(secondsToBeats(2, 90), 3);
-});
-
-test("secondsToBeats: negative or NaN inputs clamp to 0", () => {
-  assert.equal(secondsToBeats(-5, 120), 0);
-  assert.equal(secondsToBeats(NaN, 120), 0);
-  assert.equal(secondsToBeats(2, NaN), 0);
 });
 
 test("selectionStartBeats: reads time_selection_start from a selection", () => {
@@ -210,16 +193,6 @@ test("secondsToClock: minutes and seconds", () => {
 test("secondsToClock: over an hour", () => {
   assert.equal(secondsToClock(3723), "1:02:03");
 });
-test("clockToSeconds: m:ss", () => {
-  assert.equal(clockToSeconds("1:32"), 92);
-});
-test("clockToSeconds: h:mm:ss", () => {
-  assert.equal(clockToSeconds("1:02:03"), 3723);
-});
-test("clockToSeconds: garbage returns null", () => {
-  assert.equal(clockToSeconds("abc"), null);
-  assert.equal(clockToSeconds(""), null);
-});
 
 test("sanitizeFilename: spaces and punctuation to hyphens", () => {
   assert.equal(sanitizeFilename("Rick Astley - Never Gonna!"), "rick-astley-never-gonna");
@@ -238,9 +211,35 @@ test("sanitizeFilename: caps length at 60", () => {
 test("escapeHtml: escapes the five special chars", () => {
   assert.equal(escapeHtml(`<b>"x" & 'y'</b>`), "&lt;b&gt;&quot;x&quot; &amp; &#39;y&#39;&lt;/b&gt;");
 });
-test("fillTemplate: replaces every occurrence of a token", () => {
-  assert.equal(fillTemplate("__A__ and __A__ and __B__", { A: "x", B: "y" }), "x and x and y");
+test("htmlDataUrl: encodes text, inserts raw base64 verbatim, never re-scans values", () => {
+  const url = htmlDataUrl("<p>__T__</p><i>__B__</i>__Z__ #", { T: "a b% __B__" }, { B: "ab+/=" });
+  assert.equal(url, "data:text/html,%3Cp%3Ea%20b%25%20__B__%3C%2Fp%3E%3Ci%3Eab+/=%3C%2Fi%3E__Z__%20%23");
+  assert.equal(decodeURIComponent(url.slice("data:text/html,".length)), "<p>a b% __B__</p><i>ab+/=</i>__Z__ #");
 });
-test("fillTemplate: leaves unknown tokens untouched", () => {
-  assert.equal(fillTemplate("__A__ __Z__", { A: "x" }), "x __Z__");
+
+test("createPcmSink: peaks + window survive arbitrary chunk splits; peak buffer grows", () => {
+  const samples = Float32Array.from([0.1, -0.5, 0.2, 1, 0, -0.25, 0.3, 0.8, -0.1, 0.4]);
+  const sink = createPcmSink(3, 1, 2, 4); // expectedSamples=1 forces growth
+  sink.push(samples.subarray(0, 2));
+  sink.push(samples.subarray(2, 7));
+  sink.push(samples.subarray(7));
+  const { peaks, window, totalSamples } = sink.finish();
+  assert.deepEqual([...peaks], [128, 255, 204, 102]); // max|x| per 3 samples ×255; last is partial
+  assert.deepEqual([...window], [0.2, 1, 0, -0.25].map(Math.fround));
+  assert.equal(totalSamples, 10);
+});
+
+test("createPcmSink: window past the end is truncated", () => {
+  const sink = createPcmSink(5, 10, 8, 5);
+  sink.push(new Float32Array(10).fill(0.5));
+  assert.equal(sink.finish().window.length, 2);
+});
+
+test("normalizeSkin: known skins pass, anything else falls back to luna", () => {
+  assert.equal(normalizeSkin("dolphin"), "dolphin");
+  assert.equal(normalizeSkin("plumbob"), "plumbob");
+  assert.equal(normalizeSkin("luna"), "luna");
+  assert.equal(normalizeSkin('"><script>'), "luna");
+  assert.equal(normalizeSkin(undefined), "luna");
+  assert.equal(normalizeSkin(42), "luna");
 });

@@ -85,12 +85,6 @@ export function resolveTrackHandle<H>(arg: unknown): H | null {
   return (arg ?? null) as H | null;
 }
 
-/** Convert a real-time duration in seconds to musical beats at the given tempo (BPM). */
-export function secondsToBeats(seconds: number, tempo: number): number {
-  if (!Number.isFinite(seconds) || !Number.isFinite(tempo) || seconds <= 0 || tempo <= 0) return 0;
-  return (seconds * tempo) / 60;
-}
-
 /**
  * The arrangement drop position (in beats) from a context-menu command argument. The
  * `"AudioTrack.ArrangementSelection"` scope passes a selection with `time_selection_start`;
@@ -104,71 +98,139 @@ export function selectionStartBeats(arg: unknown): number {
   return 0;
 }
 
-/**
- * Half-wave-rectified energy-novelty envelope: per `hop`-sample frame, how much louder it
- * got than the previous frame. Onsets (drum hits, note attacks) show up as positive spikes.
- */
-export function onsetEnvelope(samples: Float32Array, hop = 512): Float32Array {
-  const nFrames = Math.floor(samples.length / hop);
-  if (nFrames < 2) return new Float32Array(0);
-  const rms = new Float32Array(nFrames);
-  for (let f = 0; f < nFrames; f++) {
-    let sum = 0;
-    const base = f * hop;
-    for (let j = 0; j < hop; j++) {
-      const s = samples[base + j];
-      sum += s * s;
+/** In-place iterative radix-2 FFT. `re` and `im` must share a power-of-two length. */
+function fft(re: Float64Array, im: Float64Array): void {
+  const n = re.length;
+  for (let i = 1, j = 0; i < n; i++) {
+    let bit = n >> 1;
+    for (; j & bit; bit >>= 1) j ^= bit;
+    j ^= bit;
+    if (i < j) {
+      [re[i], re[j]] = [re[j], re[i]];
+      [im[i], im[j]] = [im[j], im[i]];
     }
-    rms[f] = Math.sqrt(sum / hop);
   }
-  const env = new Float32Array(nFrames);
-  env[0] = rms[0]; // treat pre-signal as silence so an onset on frame 0 still registers
-  for (let f = 1; f < nFrames; f++) env[f] = Math.max(0, rms[f] - rms[f - 1]);
+  for (let len = 2; len <= n; len <<= 1) {
+    const half = len >> 1;
+    const wr = Math.cos((-2 * Math.PI) / len);
+    const wi = Math.sin((-2 * Math.PI) / len);
+    for (let i = 0; i < n; i += len) {
+      let cr = 1;
+      let ci = 0;
+      for (let k = 0; k < half; k++) {
+        const a = i + k;
+        const b = a + half;
+        const tr = re[b] * cr - im[b] * ci;
+        const ti = re[b] * ci + im[b] * cr;
+        re[b] = re[a] - tr;
+        im[b] = im[a] - ti;
+        re[a] += tr;
+        im[a] += ti;
+        const nr = cr * wr - ci * wi;
+        ci = cr * wi + ci * wr;
+        cr = nr;
+      }
+    }
+  }
+}
+
+/**
+ * Hann-windowed magnitude spectrum of every `hop`-spaced frame of `n` samples (a power of two).
+ * `onFrame` receives a reused buffer of n/2 bin magnitudes — copy anything you keep.
+ */
+function forEachSpectrum(samples: Float32Array, n: number, hop: number, onFrame: (mag: Float64Array) => void): void {
+  const win = new Float64Array(n);
+  for (let i = 0; i < n; i++) win[i] = 0.5 - 0.5 * Math.cos((2 * Math.PI * i) / n);
+  const re = new Float64Array(n);
+  const im = new Float64Array(n);
+  const mag = new Float64Array(n / 2);
+  for (let s = 0; s + n <= samples.length; s += hop) {
+    for (let i = 0; i < n; i++) {
+      re[i] = samples[s + i] * win[i];
+      im[i] = 0;
+    }
+    fft(re, im);
+    for (let k = 0; k < mag.length; k++) mag[k] = Math.hypot(re[k], im[k]);
+    onFrame(mag);
+  }
+}
+
+const ONSET_FFT = 1024;
+
+/**
+ * Onset-strength envelope, one value per `hop`-sample frame: log-compressed spectral flux (the
+ * summed per-bin increase since the previous frame) minus a ~1 s moving average, half-wave
+ * rectified. Unlike a plain loudness change, flux also catches hi-hats and note attacks.
+ */
+export function onsetEnvelope(samples: Float32Array, sampleRate: number, hop = 128): Float64Array {
+  const flux: number[] = [];
+  const prev = new Float64Array(ONSET_FFT / 2);
+  forEachSpectrum(samples, ONSET_FFT, hop, (mag) => {
+    let sum = 0;
+    for (let k = 0; k < mag.length; k++) {
+      const v = Math.log1p(100 * mag[k]);
+      if (flux.length > 0) sum += Math.max(0, v - prev[k]);
+      prev[k] = v;
+    }
+    flux.push(sum);
+  });
+  const w = Math.round(sampleRate / hop / 2);
+  const prefix = new Float64Array(flux.length + 1);
+  for (let i = 0; i < flux.length; i++) prefix[i + 1] = prefix[i] + flux[i];
+  const env = new Float64Array(flux.length);
+  for (let i = 0; i < flux.length; i++) {
+    const a = Math.max(0, i - w);
+    const b = Math.min(flux.length, i + w + 1);
+    env[i] = Math.max(0, flux[i] - (prefix[b] - prefix[a]) / (b - a));
+  }
   return env;
 }
 
 /**
- * Estimate tempo (BPM) and beat phase (seconds to the first beat) from raw mono PCM, by
- * autocorrelating the onset envelope. Best-effort: prone to half/double-time errors (folded
- * into a preferred 70–140 range) and an approximate phase — the trim window's tap-tempo
- * lets the user correct both. Returns `{ bpm: 0, phase: 0 }` when the input is too short.
+ * Estimate tempo (BPM) and beat phase (seconds to the first beat) from raw mono PCM.
+ * Autocorrelates the onset envelope over 50–240 BPM and scores each candidate period by its
+ * own correlation plus half the correlation at twice the period (a real beat also repeats every
+ * two beats), weighted by a log-normal preference for tempos near 130 BPM. There's no fixed
+ * folding range, so fast tracks (155, 171) aren't halved. Still best-effort — half/double-time
+ * mistakes can happen, and the trim window lets the user correct them. Constants were picked on
+ * a set of reference tracks. Returns `{ bpm: 0, phase: 0 }` for input shorter than ~2.5 s.
  */
-export function detectBpm(samples: Float32Array, sampleRate: number, hop = 512): { bpm: number; phase: number } {
-  const env = onsetEnvelope(samples, hop);
-  if (env.length < 8 || sampleRate <= 0) return { bpm: 0, phase: 0 };
+export function detectBpm(samples: Float32Array, sampleRate: number): { bpm: number; phase: number } {
+  if (sampleRate <= 0) return { bpm: 0, phase: 0 };
+  const hop = 128;
+  const env = onsetEnvelope(samples, sampleRate, hop);
   const envRate = sampleRate / hop;
+  const minLag = Math.max(2, Math.floor((60 * envRate) / 240));
+  const maxLag = Math.ceil((60 * envRate) / 50);
+  if (env.length <= 2 * maxLag + 1) return { bpm: 0, phase: 0 };
 
-  const minLag = Math.max(1, Math.round((60 * envRate) / 180));
-  const maxLag = Math.min(env.length - 1, Math.round((60 * envRate) / 60));
-  const ac = new Float32Array(maxLag + 2);
-  let bestLag = minLag;
-  let bestVal = -1;
-  for (let lag = minLag; lag <= maxLag; lag++) {
+  const ac = new Float64Array(2 * maxLag + 2);
+  for (let lag = minLag - 1; lag < ac.length; lag++) {
     let sum = 0;
     for (let i = lag; i < env.length; i++) sum += env[i] * env[i - lag];
-    const norm = sum / (env.length - lag); // remove the bias toward shorter lags
-    ac[lag] = norm;
-    if (norm > bestVal) {
-      bestVal = norm;
+    ac[lag] = sum / (env.length - lag); // per-overlap mean, so short lags aren't favored
+  }
+  let bestLag = minLag;
+  let bestScore = -Infinity;
+  for (let lag = minLag; lag <= maxLag; lag++) {
+    const prior = Math.exp(-0.5 * (Math.log2((60 * envRate) / lag / 130) / 0.8) ** 2);
+    const score = (ac[lag] + 0.5 * ac[2 * lag]) * prior;
+    if (score > bestScore) {
+      bestScore = score;
       bestLag = lag;
     }
   }
-  // Parabolic interpolation around the peak for sub-frame lag precision.
-  let refined = bestLag;
-  const lm = ac[bestLag - 1] ?? 0;
-  const lp = ac[bestLag + 1] ?? 0;
+  // Parabolic interpolation around the chosen lag for sub-frame precision.
+  const lm = ac[bestLag - 1];
+  const lp = ac[bestLag + 1];
   const denom = lm - 2 * ac[bestLag] + lp;
-  if (denom !== 0) refined = bestLag + (0.5 * (lm - lp)) / denom;
-
-  let bpm = (60 * envRate) / refined;
-  while (bpm < 70) bpm *= 2;
-  while (bpm > 140) bpm /= 2;
+  const offset = denom !== 0 ? (0.5 * (lm - lp)) / denom : 0;
+  const period = bestLag + Math.max(-0.5, Math.min(0.5, offset));
 
   // Phase: which beat offset best lines up with the onset peaks.
-  const period = refined;
   let bestOff = 0;
   let bestOffVal = -1;
-  for (let off = 0; off < period; off += 1) {
+  for (let off = 0; off < period; off++) {
     let sum = 0;
     // Window ±1 frame so beat positions still catch a spike despite fractional-period rounding.
     for (let pos = off; pos < env.length; pos += period) {
@@ -180,31 +242,17 @@ export function detectBpm(samples: Float32Array, sampleRate: number, hop = 512):
       bestOff = off;
     }
   }
-  const phase = (bestOff * hop) / sampleRate;
-  return { bpm: Math.round(bpm * 10) / 10, phase };
-}
-
-/**
- * Goertzel magnitude — the energy of `samples` at a single frequency, normalized by length.
- * Cheaper than a full FFT when you only need a handful of target frequencies (the semitones).
- */
-export function goertzelMagnitude(samples: Float32Array, freq: number, sampleRate: number): number {
-  if (samples.length === 0 || sampleRate <= 0) return 0;
-  const coeff = 2 * Math.cos((2 * Math.PI * freq) / sampleRate);
-  let s1 = 0;
-  let s2 = 0;
-  for (let i = 0; i < samples.length; i++) {
-    const s0 = samples[i] + coeff * s1 - s2;
-    s2 = s1;
-    s1 = s0;
-  }
-  const power = s1 * s1 + s2 * s2 - coeff * s1 * s2;
-  return Math.sqrt(Math.max(0, power)) / samples.length;
+  // A flux frame peaks when the onset reaches the middle of its FFT window.
+  const phase = (bestOff * hop + ONSET_FFT / 2) / sampleRate;
+  return { bpm: Math.round(((60 * envRate) / period) * 10) / 10, phase };
 }
 
 const NOTE_NAMES = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"];
-const KRUMHANSL_MAJOR = [6.35, 2.23, 3.48, 2.33, 4.38, 4.09, 2.52, 5.19, 2.39, 3.66, 2.29, 2.88];
-const KRUMHANSL_MINOR = [6.33, 2.68, 3.52, 5.38, 2.6, 3.53, 2.54, 4.75, 3.98, 2.69, 3.34, 3.17];
+// Scale-degree weights: tonic 2, third and fifth 1.5, other scale notes 1. On the reference
+// tracks these beat the Krumhansl and Temperley profiles, which weight chromatic notes.
+const MAJOR_PROFILE = [2, 0, 1, 0, 1.5, 1, 0, 1.5, 0, 1, 0, 1];
+const MINOR_PROFILE = [2, 0, 1, 1.5, 0, 1, 0, 1.5, 1, 0, 1, 0.5];
+const KEY_FFT = 4096;
 
 function pearson(a: number[], b: number[]): number {
   const n = a.length;
@@ -229,49 +277,62 @@ function pearson(a: number[], b: number[]): number {
   return da === 0 || db === 0 ? 0 : num / Math.sqrt(da * db);
 }
 
-/** Sum Goertzel energy per semitone (MIDI 36–83) into 12 pitch-class bins. */
+/**
+ * 12-bin pitch-class profile built from spectral peaks between 100 Hz and 5 kHz. Only local
+ * maxima at ≥1% of the frame's loudest bin count, which keeps broadband drum energy out; each
+ * peak's interpolated frequency is rounded to the nearest semitone.
+ */
 export function chromaVector(samples: Float32Array, sampleRate: number): number[] {
   const chroma = new Array(12).fill(0);
-  if (samples.length === 0 || sampleRate <= 0) return chroma;
-  // Key is stable; analyzing the first ~60s keeps Goertzel fast and numerically sane.
-  const slice = samples.length > sampleRate * 60 ? samples.subarray(0, sampleRate * 60) : samples;
-  for (let midi = 36; midi <= 83; midi++) {
-    const freq = 440 * Math.pow(2, (midi - 69) / 12);
-    if (freq >= sampleRate / 2) continue;
-    chroma[midi % 12] += goertzelMagnitude(slice, freq, sampleRate);
-  }
+  if (sampleRate <= 0) return chroma;
+  forEachSpectrum(samples, KEY_FFT, KEY_FFT / 2, (mag) => {
+    let max = 0;
+    for (let k = 0; k < mag.length; k++) if (mag[k] > max) max = mag[k];
+    for (let k = 2; k < mag.length - 1; k++) {
+      const m = mag[k];
+      if (m <= mag[k - 1] || m < mag[k + 1] || m < max * 0.01) continue;
+      // Parabolic interpolation on log magnitudes for the true peak frequency.
+      const la = Math.log(mag[k - 1] + 1e-12);
+      const lb = Math.log(m + 1e-12);
+      const lc = Math.log(mag[k + 1] + 1e-12);
+      const d = la - 2 * lb + lc;
+      const freq = ((k + (d !== 0 ? (0.5 * (la - lc)) / d : 0)) * sampleRate) / KEY_FFT;
+      if (freq < 100 || freq > 5000) continue;
+      chroma[((Math.round(69 + 12 * Math.log2(freq / 440)) % 12) + 12) % 12] += m;
+    }
+  });
   return chroma;
 }
 
 /**
- * Best-matching key for a 12-bin chroma vector, via correlation against the
- * Krumhansl–Schmuckler major/minor profiles rotated to all 12 tonics. Returns e.g. "A min".
- * Best-effort (~70%): relative major/minor are easily confused.
+ * Best-matching key for a 12-bin chroma vector, by correlation against the major/minor
+ * profiles rotated to all 12 tonics. Returns e.g. "A min".
  */
 export function chromaToKey(chroma: number[]): string {
   let bestScore = -Infinity;
   let bestName = "";
   for (let tonic = 0; tonic < 12; tonic++) {
-    const maj = chroma.map((_, p) => KRUMHANSL_MAJOR[(p - tonic + 12) % 12]);
-    const sMaj = pearson(chroma, maj);
-    if (sMaj > bestScore) {
-      bestScore = sMaj;
-      bestName = `${NOTE_NAMES[tonic]} maj`;
-    }
-    const min = chroma.map((_, p) => KRUMHANSL_MINOR[(p - tonic + 12) % 12]);
-    const sMin = pearson(chroma, min);
-    if (sMin > bestScore) {
-      bestScore = sMin;
-      bestName = `${NOTE_NAMES[tonic]} min`;
+    for (const [profile, mode] of [
+      [MAJOR_PROFILE, "maj"],
+      [MINOR_PROFILE, "min"],
+    ] as const) {
+      const score = pearson(chroma, chroma.map((_, p) => profile[(p - tonic + 12) % 12]));
+      if (score > bestScore) {
+        bestScore = score;
+        bestName = `${NOTE_NAMES[tonic]} ${mode}`;
+      }
     }
   }
   return bestName;
 }
 
-/** Detect the musical key of raw mono PCM. Returns "" for empty input. Best-effort (~70%). */
+/**
+ * Detect the musical key of raw mono PCM. Returns "" when there's too little audio to analyze.
+ * Best-effort: the usual misses are the fifth or the relative major/minor.
+ */
 export function detectKey(samples: Float32Array, sampleRate: number): string {
-  if (samples.length === 0 || sampleRate <= 0) return "";
-  return chromaToKey(chromaVector(samples, sampleRate));
+  const chroma = chromaVector(samples, sampleRate);
+  return chroma.some((v) => v > 0) ? chromaToKey(chroma) : "";
 }
 
 /** Seconds → "m:ss" (or "h:mm:ss" past an hour). Negative/NaN clamp to 0. */
@@ -282,17 +343,6 @@ export function secondsToClock(totalSeconds: number): string {
   const secs = s % 60;
   const pad = (n: number) => String(n).padStart(2, "0");
   return hrs > 0 ? `${hrs}:${pad(mins)}:${pad(secs)}` : `${mins}:${pad(secs)}`;
-}
-
-/** "m:ss" or "h:mm:ss" → seconds. Returns null on malformed input. */
-export function clockToSeconds(clock: string): number | null {
-  const parts = clock.trim().split(":");
-  if (parts.length < 2 || parts.length > 3) return null;
-  if (!parts.every((p) => /^\d+$/.test(p))) return null;
-  const nums = parts.map(Number);
-  return parts.length === 3
-    ? nums[0] * 3600 + nums[1] * 60 + nums[2]
-    : nums[0] * 60 + nums[1];
 }
 
 /** Title → safe lowercase hyphenated filename stem (no extension). Falls back to "sample". */
@@ -307,6 +357,17 @@ export function sanitizeFilename(title: string): string {
   return slug || "sample";
 }
 
+export const SKINS = ["luna", "dolphin", "plumbob"] as const; // keep in sync with ui/*.html
+export type Skin = (typeof SKINS)[number];
+
+/**
+ * A known skin name, else the default "luna". Skin values come back from the dialogs and go
+ * into HTML/JS templates, so only allowlisted names get through.
+ */
+export function normalizeSkin(value: unknown): Skin {
+  return SKINS.includes(value as Skin) ? (value as Skin) : "luna";
+}
+
 /** Escape a string for safe insertion into HTML text or a double/single-quoted attribute. */
 export function escapeHtml(s: string): string {
   return s
@@ -317,9 +378,66 @@ export function escapeHtml(s: string): string {
     .replace(/'/g, "&#39;");
 }
 
-/** Replace every `__KEY__` token in `template` with `values[KEY]`. Unknown tokens are left as-is. */
-export function fillTemplate(template: string, values: Record<string, string>): string {
-  return template.replace(/__([A-Z0-9_]+)__/g, (whole, key: string) =>
-    key in values ? values[key] : whole,
-  );
+/**
+ * Fill every `__KEY__` token in an HTML template and return it as a `data:text/html,` URL.
+ * The template and `text` values are percent-encoded; `raw` values (big base64 payloads) go in
+ * as-is — base64 has no `%` or `#`, so it needs no encoding, and skipping encodeURIComponent
+ * saves another full copy of a many-MB string. Substituted values are never re-scanned for
+ * tokens. Unknown tokens are left as-is.
+ */
+export function htmlDataUrl(template: string, text: Record<string, string>, raw: Record<string, string> = {}): string {
+  const parts = template.split(/__([A-Z0-9_]+)__/); // odd indices are token keys
+  for (let i = 0; i < parts.length; i++) {
+    const s = parts[i];
+    if (i % 2 === 0) parts[i] = encodeURIComponent(s);
+    else if (s in raw) parts[i] = raw[s];
+    else parts[i] = encodeURIComponent(s in text ? text[s] : `__${s}__`);
+  }
+  return "data:text/html," + parts.join("");
+}
+
+/**
+ * Streaming sink for decoded mono PCM, so a long track never sits in memory whole. Keeps one
+ * byte per `samplesPerPeak` samples (max |amplitude| → 0–255, for the waveform) plus a copy of
+ * the samples in `[winStart, winStart + winLen)` (for BPM/key detection). `expectedSamples` only
+ * sizes the first allocation; the peak buffer grows if the stream runs longer.
+ */
+export function createPcmSink(samplesPerPeak: number, expectedSamples: number, winStart: number, winLen: number) {
+  let peaks = new Uint8Array(Math.ceil(Math.max(1, expectedSamples) / samplesPerPeak));
+  let nPeaks = 0;
+  let cur = 0; // running max of the peak being built
+  let pos = 0; // samples seen so far
+  const win = new Float32Array(Math.max(0, winLen));
+
+  function flush() {
+    if (nPeaks === peaks.length) {
+      const grown = new Uint8Array(peaks.length * 2);
+      grown.set(peaks);
+      peaks = grown;
+    }
+    peaks[nPeaks++] = Math.min(255, Math.round(cur * 255));
+    cur = 0;
+  }
+
+  return {
+    push(chunk: Float32Array) {
+      const a = Math.max(winStart, pos);
+      const b = Math.min(winStart + win.length, pos + chunk.length);
+      if (b > a) win.set(chunk.subarray(a - pos, b - pos), a - winStart);
+      for (let i = 0; i < chunk.length; i++) {
+        const v = Math.abs(chunk[i]);
+        if (v > cur) cur = v;
+        if ((pos + i + 1) % samplesPerPeak === 0) flush();
+      }
+      pos += chunk.length;
+    },
+    finish() {
+      if (pos % samplesPerPeak !== 0) flush(); // trailing partial peak
+      return {
+        peaks: peaks.subarray(0, nPeaks),
+        window: win.subarray(0, Math.max(0, Math.min(win.length, pos - winStart))),
+        totalSamples: pos,
+      };
+    },
+  };
 }

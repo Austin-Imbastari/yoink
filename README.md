@@ -14,24 +14,26 @@ Wrapped in a Y2K / Windows-2000 "MS Paint" aesthetic, because a sampling utility
 - **Fetches** the video's title, channel, and audio.
 - **Waveform trim** — drag the in/out handles, scroll to zoom, drag to pan, hit play to scrub and preview the selection before committing.
 - **Drops the trimmed WAV** into the Arrangement on the selected (or a new) track, named from the video title, at your chosen sample rate.
-- **Cleans up after itself** — the full download is deleted once the trimmed sample has been copied into your project.
+- **Cleans up after itself** — every run works in its own temp folder, which is deleted when it finishes, is cancelled, or fails.
+- **Skins** — switch between **Luna** (XP blue), **Dolphin** (pink & sky blue) and **Plumbob** (Media Player lime) from the Skin menu; your pick is remembered.
+- **Light on memory** — the track is stream-decoded once into compact waveform peaks plus a 90-second window for BPM/key detection, so memory stays small whatever the length. Links are capped at 60 minutes because the audio preview is inlined into the trim window.
 
 ## How it works
 
 The host (Node, via the Extensions SDK) registers an `AudioTrack` context-menu action and orchestrates a small sequence of dialogs:
 
 1. **Paste window** → returns the URL.
-2. **Progress dialog** while `yt-dlp` downloads the audio and `ffmpeg` renders a compact preview.
-3. **Trim window** — an HTML dialog with the preview inlined; the waveform is decoded and drawn client-side with the Web Audio API.
+2. **Progress dialog** while `yt-dlp` downloads the audio; `ffmpeg` renders a compact preview and, in parallel, stream-decodes the track into waveform peaks + a BPM/key analysis window.
+3. **Trim window** — an HTML dialog with the preview and peaks inlined as base64; the waveform is drawn from the peaks, so the dialog never decodes the full track.
 4. On confirm, `ffmpeg` trims to a WAV at the chosen sample rate, the SDK imports it into the project, and a clip is created on the track.
 
 ## Tech
 
 - **TypeScript + Node** on the **Ableton Extensions SDK** (`@ableton-extensions/sdk`, 1.0.0 beta)
 - **yt-dlp** + **ffmpeg** for fetching / trimming / converting audio
-- **Web Audio API** for the waveform (peak extraction, zoom/pan, preview)
+- **Canvas** waveform from host-computed peaks (zoom/pan), `<audio>` for the looping preview
 - **esbuild** to bundle the extension (with HTML inlined as text)
-- **Node's built-in test runner** for the pure logic (URL parsing, clock conversion, filename sanitization, ffmpeg arg building)
+- **Node's built-in test runner** for the pure logic (URL parsing, peak streaming, BPM/key detection, filename sanitization, ffmpeg arg building)
 
 ## Prerequisites
 
