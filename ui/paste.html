@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="en">
+<html lang="en" data-skin="__SKIN__">
   <head>
     <meta charset="UTF-8" />
     <title>Yoink</title>
@@ -8,6 +8,119 @@
       rel="stylesheet"
     />
     <style>
+      /* ---- skins: every color below comes from these tokens (same set in trim.html) ---- */
+      :root {
+        /* Luna — Windows XP blue */
+        --chrome: #ece9d8;
+        --chrome-line: #aca899;
+        --panel: #ffffff;
+        --field: #ffffff;
+        --screen: #ffffff;
+        --title: linear-gradient(180deg, #4a93f8 0%, #2566db 50%, #0f3fb5 100%);
+        --title-ink: #ffffff;
+        --ink: #1a3a6e;
+        --ink-2: #3a5a8c;
+        --ink-soft: #4a6fa5;
+        --ink-faint: #5a7fc4;
+        --caption: #6f86b0;
+        --quiet-ink: #333333;
+        --field-ink: #103a8e;
+        --accent: #1648c4;
+        --accent-ink: #ffffff;
+        --btn: linear-gradient(180deg, #4a93f8, #1648c4);
+        --btn-shadow: rgba(20, 60, 160, 0.5);
+        --btn-active: #4a93f8;
+        --play: linear-gradient(180deg, #86d94e, #3e9c20);
+        --marker: #15c4ba;
+        --region: rgba(23, 196, 186, 0.13);
+        --playhead: #0a2a6a;
+        --wave: #5aa0f5;
+        --grid: 22, 72, 196; /* rgb of the beat lines */
+        --err-bg: #e7f0ff;
+        --err-line: #7da2e0;
+        --err-ink: #1a3f8a;
+        --menu-hi: #316ac5;
+        --dialog-line: #0f3fb5;
+        --dialog-shadow: rgba(20, 60, 160, 0.4);
+        --backdrop: rgba(15, 63, 181, 0.25);
+      }
+      html[data-skin="dolphin"] {
+        /* Dolphin — pink dolphin title bar, sky-blue buttons + waveform, lavender CRT screen */
+        --chrome: #efe6fb;
+        --chrome-line: #c3a9e3;
+        --panel: #fffaff;
+        --field: #ffffff;
+        --screen: #f3ebff;
+        --title: linear-gradient(180deg, #ffa6e3 0%, #e263c0 50%, #b43b98 100%);
+        --title-ink: #ffffff;
+        --ink: #4b2a73;
+        --ink-2: #6a4596;
+        --ink-soft: #7652a3;
+        --ink-faint: #9270bf;
+        --caption: #9a82bd;
+        --quiet-ink: #4b2a73;
+        --field-ink: #2a5bb8;
+        --accent: #2a78cf;
+        --accent-ink: #ffffff;
+        --btn: linear-gradient(180deg, #8fd3ff 0%, #3b8fe0 55%, #2a6fc4 100%);
+        --btn-shadow: rgba(180, 59, 152, 0.45);
+        --btn-active: #e263c0;
+        --play: linear-gradient(180deg, #ffa6e3, #d24aa9);
+        --marker: #ff4fb8;
+        --region: rgba(255, 79, 184, 0.09);
+        --playhead: #2a3f8f;
+        --wave: #58aef0;
+        --grid: 150, 70, 190;
+        --err-bg: #fde8f6;
+        --err-line: #e79bd0;
+        --err-ink: #8a2a6e;
+        --menu-hi: #e263c0;
+        --dialog-line: #b43b98;
+        --dialog-shadow: rgba(59, 143, 224, 0.45);
+        --backdrop: rgba(180, 59, 152, 0.22);
+      }
+      html[data-skin="plumbob"] {
+        /* Plumbob — XP Media Player lime: glossy green chrome, mint screen, lilac markers */
+        --chrome: #e6f2dc;
+        --chrome-line: #9cc584;
+        --panel: #ffffff;
+        --field: #ffffff;
+        --screen: #eefae4;
+        --title: linear-gradient(180deg, #a6ea74 0%, #5cb82e 50%, #3a8a1c 100%);
+        --title-ink: #ffffff;
+        --ink: #1f4a12;
+        --ink-2: #35661f;
+        --ink-soft: #4d7a36;
+        --ink-faint: #5f8f45;
+        --caption: #6f9a58;
+        --quiet-ink: #1f4a12;
+        --field-ink: #2d6a12;
+        --accent: #2f7f17;
+        --accent-ink: #ffffff;
+        --btn: linear-gradient(180deg, #b6f07a 0%, #5cc02c 55%, #3b8f18 100%);
+        --btn-shadow: rgba(40, 90, 20, 0.45);
+        --btn-active: #6fcf3a;
+        --play: linear-gradient(180deg, #c6ee4a, #5fae1b);
+        --marker: #9b6cf0;
+        --region: rgba(155, 108, 240, 0.1);
+        --playhead: #1f4a12;
+        --wave: #58b83a;
+        --grid: 40, 110, 25;
+        --err-bg: #effbe6;
+        --err-line: #9fd37f;
+        --err-ink: #2e6a14;
+        --menu-hi: #5cb42f;
+        --dialog-line: #3a8a1c;
+        --dialog-shadow: rgba(58, 138, 28, 0.4);
+        --backdrop: rgba(58, 138, 28, 0.22);
+      }
+      html[data-skin="dolphin"] .tbar > span:first-child::after {
+        content: " 🐬";
+      }
+      html[data-skin="plumbob"] .tbar > span:first-child::after {
+        content: " 💚";
+      }
+
       html,
       body {
         margin: 0;
@@ -15,27 +128,27 @@
       }
       body {
         font-family: "Pixelify Sans", Tahoma, sans-serif;
-        background: #ece9d8;
+        background: var(--chrome);
         display: flex;
         flex-direction: column;
       }
       .tbar {
-        background: linear-gradient(180deg, #4a93f8 0%, #2566db 50%, #0f3fb5 100%);
-        color: #ffffff;
-        font-size: 13px;
-        padding: 6px 9px;
+        background: var(--title);
+        color: var(--title-ink);
+        font-size: 15px;
+        padding: 7px 11px;
         display: flex;
         justify-content: space-between;
       }
       .mbar {
-        background: #ece9d8;
-        font-size: 13px;
-        padding: 3px 9px;
-        color: #1a3a6e;
+        background: var(--chrome);
+        font-size: 15px;
+        padding: 4px 11px;
+        color: var(--ink);
         display: flex;
-        gap: 14px;
+        gap: 16px;
         align-items: center;
-        border-bottom: 1px solid #aca899;
+        border-bottom: 1px solid var(--chrome-line);
       }
       .mbar u {
         text-decoration: underline;
@@ -43,81 +156,209 @@
       .sig {
         margin-left: auto;
         font-family: "VT323", monospace;
-        color: #5a7fc4;
+        font-size: 17px;
+        color: var(--ink-faint);
       }
       .body {
-        background: #ffffff;
-        padding: 12px;
+        background: var(--panel);
+        padding: 14px;
         flex: 1;
       }
       .err {
-        background: #e7f0ff;
-        border: 1px solid #7da2e0;
-        color: #1a3f8a;
+        background: var(--err-bg);
+        border: 1px solid var(--err-line);
+        color: var(--err-ink);
         font-family: "VT323", monospace;
-        font-size: 14px;
-        padding: 5px 8px;
+        font-size: 16px;
+        padding: 6px 9px;
         border-radius: 4px;
-        margin-bottom: 9px;
+        margin-bottom: 10px;
       }
       .lbl {
-        font-size: 11px;
-        color: #4a6fa5;
-        margin-bottom: 3px;
+        font-size: 13px;
+        color: var(--ink-soft);
+        margin-bottom: 4px;
       }
       .caption {
-        font-size: 10px;
-        color: #6f86b0;
-        margin-top: 5px;
+        font-size: 12px;
+        color: var(--caption);
+        margin-top: 6px;
         letter-spacing: 0.3px;
       }
       .url {
         width: 100%;
         box-sizing: border-box;
-        background: #fff;
-        border: 2px inset #aca899;
+        background: var(--field);
+        border: 2px inset var(--chrome-line);
         border-radius: 3px;
-        height: 28px;
+        height: 32px;
         font-family: "VT323", monospace;
-        font-size: 16px;
-        color: #103a8e;
-        padding: 0 8px;
+        font-size: 18px;
+        color: var(--field-ink);
+        padding: 0 9px;
       }
       .row {
         display: flex;
-        gap: 8px;
-        margin-top: 11px;
+        gap: 9px;
+        margin-top: 13px;
       }
       button {
         font-family: inherit;
         border: 1px solid #fff;
-        border-radius: 5px;
-        padding: 6px 14px;
-        font-size: 13px;
+        border-radius: 6px;
+        padding: 7px 16px;
+        font-size: 15px;
         cursor: pointer;
       }
       .go {
-        background: linear-gradient(180deg, #4a93f8, #1648c4);
+        background: var(--btn);
         color: #fff;
-        box-shadow: 1px 1px 0 rgba(20, 60, 160, 0.5);
+        box-shadow: 1px 1px 0 var(--btn-shadow);
       }
       .cancel {
-        background: #ece9d8;
-        color: #333333;
-        border-color: #aca899;
+        background: var(--chrome);
+        color: var(--quiet-ink);
+        border-color: var(--chrome-line);
       }
       .hint {
-        font-size: 11px;
-        color: #6f86b0;
-        margin-top: 6px;
+        font-size: 13px;
+        color: var(--caption);
+        margin-top: 7px;
+      }
+
+      /* ---- Skin menu ---- */
+      .menuwrap {
+        position: relative;
+      }
+      .menuitem,
+      .helpbtn {
+        cursor: pointer;
+      }
+      .menuitem {
+        padding: 0 3px;
+        margin: 0 -3px;
+        border-radius: 2px;
+      }
+      .menuitem[aria-expanded="true"] {
+        background: var(--menu-hi);
+        color: #fff;
+      }
+      .menu {
+        position: absolute;
+        top: calc(100% + 5px);
+        left: -5px;
+        z-index: 10;
+        min-width: 172px;
+        padding: 4px;
+        background: var(--field);
+        border: 1px solid var(--chrome-line);
+        box-shadow: 2px 2px 0 var(--dialog-shadow);
+      }
+      .menu button {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        width: 100%;
+        padding: 5px 9px;
+        border: 0;
+        border-radius: 2px;
+        background: none;
+        box-shadow: none;
+        font: inherit;
+        font-size: 15px;
+        color: var(--ink);
+        text-align: left;
+        cursor: pointer;
+      }
+      .menu button:hover,
+      .menu button:focus-visible {
+        background: var(--menu-hi);
+        color: #fff;
+        outline: none;
+      }
+      .tick {
+        width: 12px;
+        visibility: hidden;
+      }
+      .menu button[aria-checked="true"] .tick {
+        visibility: visible;
+      }
+      .swatch {
+        margin-left: auto;
+        width: 18px;
+        height: 13px;
+        border: 1px solid rgba(0, 0, 0, 0.3);
+        border-radius: 2px;
+      }
+      .swatch.luna {
+        background: linear-gradient(135deg, #2566db 50%, #ece9d8 50%);
+      }
+      .swatch.dolphin {
+        background: linear-gradient(135deg, #e263c0 50%, #58aef0 50%);
+      }
+      .swatch.plumbob {
+        background: linear-gradient(135deg, #5cb82e 50%, #9b6cf0 50%);
+      }
+
+      /* ---- Help dialog ---- */
+      #help {
+        border: 1px solid var(--dialog-line);
+        border-radius: 6px;
+        padding: 0;
+        width: min(380px, calc(100vw - 24px));
+        max-height: calc(100vh - 24px);
+        overflow: auto;
+        background: var(--panel);
+        color: var(--ink);
+        font-family: inherit;
+        box-shadow: 3px 3px 0 var(--dialog-shadow);
+      }
+      #help::backdrop {
+        background: var(--backdrop);
+      }
+      #help .helpx {
+        background: none;
+        border: 0;
+        color: var(--title-ink);
+        font: inherit;
+        padding: 0 4px;
+      }
+      .helpbody {
+        padding: 12px 14px 14px;
+        font-size: 15px;
+        line-height: 1.45;
+      }
+      .helpbody p {
+        margin: 0 0 7px;
+      }
+      .helpbody ol {
+        margin: 0;
+        padding-left: 20px;
+      }
+      .helpsig {
+        margin-top: 12px;
+        text-align: right;
+        font-family: "VT323", monospace;
+        font-size: 18px;
+        color: var(--accent);
       }
     </style>
   </head>
   <body>
     <div class="tbar"><span>Yoink any links ♡</span><span>_ ▢ ✕</span></div>
     <div class="mbar">
-      <span><u>F</u>ile</span><span><u>E</u>dit</span><span><u>H</u>elp</span
-      ><span class="sig">Developed by gudimbz ♡</span>
+      <span><u>F</u>ile</span>
+      <span><u>E</u>dit</span>
+      <span class="menuwrap">
+        <span class="menuitem" id="skinBtn" aria-haspopup="menu" aria-expanded="false"><u>S</u>kin</span>
+        <div class="menu" id="skinMenu" role="menu" hidden>
+          <button role="menuitemradio" data-skin="luna"><span class="tick">✓</span>Luna<span class="swatch luna"></span></button>
+          <button role="menuitemradio" data-skin="dolphin"><span class="tick">✓</span>Dolphin<span class="swatch dolphin"></span></button>
+          <button role="menuitemradio" data-skin="plumbob"><span class="tick">✓</span>Plumbob<span class="swatch plumbob"></span></button>
+        </div>
+      </span>
+      <span class="helpbtn" id="helpBtn"><u>H</u>elp</span>
+      <span class="sig">Developed by gudimbz ♡</span>
     </div>
     <div class="body">
       <div class="err" id="err" style="display: none">__ERROR__</div>
@@ -125,14 +366,34 @@
       <input class="url" id="url" value="__URL__" placeholder="paste any link…" autofocus />
       <div class="caption">youtube · tiktok · instagram · soundcloud · …</div>
       <div class="row">
-        <button class="go" onclick="load()">load ♪</button>
-        <button class="cancel" onclick="send('')">cancel</button>
+        <button class="go" id="go">load ♪</button>
+        <button class="cancel" id="cancel">cancel</button>
       </div>
       <div class="hint" id="hint"></div>
     </div>
+    <dialog id="help">
+      <div class="tbar"><span>About Yoink ♡</span><button class="helpx" id="helpClose" aria-label="Close help">✕</button></div>
+      <div class="helpbody">
+        <p>
+          Yoink grabs the audio from any link — YouTube, TikTok, Instagram, SoundCloud &amp; more — and drops it
+          straight into your Set as a WAV. No browser, no downloader, no file hunting.
+        </p>
+        <ol>
+          <li>paste a link</li>
+          <li>trim the bit you want — scroll to zoom, drag to pan, ▶ to loop it</li>
+          <li>check the BPM &amp; key (tap to fix the tempo)</li>
+          <li>pick warp / loop, then drop into set ♪</li>
+        </ol>
+        <div class="helpsig">happy yoinking ♡ by imba</div>
+      </div>
+    </dialog>
     <script>
-      function send(result) {
-        const message = { method: "close_and_send", params: [result] };
+      const SKINS = ["luna", "dolphin", "plumbob"];
+      let skin = SKINS.includes("__SKIN__") ? "__SKIN__" : "luna";
+
+      // The result carries the skin too, so the host remembers a skin picked here even on cancel.
+      function send(url) {
+        const message = { method: "close_and_send", params: [JSON.stringify({ url, skin })] };
         if (window.webkit?.messageHandlers?.live) window.webkit.messageHandlers.live.postMessage(message);
         else if (window.chrome?.webview) window.chrome.webview.postMessage(message);
       }
@@ -140,6 +401,9 @@
         const v = document.getElementById("url").value.trim();
         if (v) send(v);
       }
+      // Wire via addEventListener (inline onclick is blocked by the dialog's CSP).
+      document.getElementById("go").addEventListener("click", load);
+      document.getElementById("cancel").addEventListener("click", () => send(""));
       // Show the error block only when the token was filled with a real message.
       const err = document.getElementById("err");
       if (err.textContent && err.textContent !== "__" + "ERROR__") err.style.display = "block";
@@ -150,6 +414,42 @@
       });
       urlEl.addEventListener("keydown", (e) => {
         if (e.key === "Enter") load();
+      });
+
+      // ---- skin menu ----
+      const skinBtn = document.getElementById("skinBtn");
+      const skinMenu = document.getElementById("skinMenu");
+      function applySkin(name) {
+        skin = name;
+        document.documentElement.dataset.skin = name;
+        skinMenu
+          .querySelectorAll("[data-skin]")
+          .forEach((item) => item.setAttribute("aria-checked", String(item.dataset.skin === name)));
+      }
+      function openSkinMenu(open) {
+        skinMenu.hidden = !open;
+        skinBtn.setAttribute("aria-expanded", String(open));
+      }
+      skinBtn.addEventListener("click", (e) => {
+        e.stopPropagation(); // the document listener below would close it again
+        openSkinMenu(skinMenu.hidden);
+      });
+      skinMenu.addEventListener("click", (e) => {
+        const item = e.target.closest("[data-skin]");
+        if (item) applySkin(item.dataset.skin);
+      });
+      document.addEventListener("click", () => openSkinMenu(false));
+      document.addEventListener("keydown", (e) => {
+        if (e.key === "Escape") openSkinMenu(false);
+      });
+      applySkin(skin);
+
+      // ---- help ----
+      const help = document.getElementById("help");
+      document.getElementById("helpBtn").addEventListener("click", () => help.showModal());
+      document.getElementById("helpClose").addEventListener("click", () => help.close());
+      help.addEventListener("click", (e) => {
+        if (e.target === help) help.close(); // click on the backdrop
       });
     </script>
   </body>

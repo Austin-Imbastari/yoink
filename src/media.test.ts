@@ -1,9 +1,11 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { buildInfoArgs, buildDownloadArgs, buildPreviewArgs, buildTrimArgs, buildPcmArgs } from "./media.ts";
+import { buildInfoArgs, buildDownloadArgs, buildPreviewArgs, buildTrimArgs, buildPcmArgs, parseProgress } from "./media.ts";
 
-test("buildInfoArgs: single-json, no playlist", () => {
-  assert.deepEqual(buildInfoArgs("URL"), ["--dump-single-json", "--no-playlist", "URL"]);
+test("buildInfoArgs: prints only the needed fields, no playlist", () => {
+  assert.deepEqual(buildInfoArgs("URL"), [
+    "--no-playlist", "-O", "%(.{title,channel,uploader,duration,extractor_key,extractor})j", "URL",
+  ]);
 });
 
 test("buildPcmArgs: mono f32le at 11025 Hz", () => {
@@ -12,16 +14,26 @@ test("buildPcmArgs: mono f32le at 11025 Hz", () => {
   ]);
 });
 
-test("buildDownloadArgs: bestaudio, prints the final written path", () => {
+test("buildDownloadArgs: bestaudio, prints the final path and parseable progress", () => {
   assert.deepEqual(buildDownloadArgs("URL", "/tmp/src.%(ext)s"), [
     "-f", "bestaudio/best", "--no-playlist", "--no-simulate", "--print", "after_move:filepath",
+    "--progress", "--newline", "--progress-template",
+    "download:[yoink-progress] %(progress.downloaded_bytes)s %(progress.total_bytes)s %(progress.total_bytes_estimate)s",
     "-o", "/tmp/src.%(ext)s", "URL",
   ]);
 });
 
-test("buildPreviewArgs: mono mp3 96k", () => {
+test("parseProgress: exact total, estimate fallback, unknown size, other lines", () => {
+  assert.equal(parseProgress("[yoink-progress] 512 1024 NA"), 0.5);
+  assert.equal(parseProgress("[yoink-progress] 300 NA 1200"), 0.25);
+  assert.equal(parseProgress("[yoink-progress] 2048 1024 NA"), 1); // clamped
+  assert.equal(parseProgress("[yoink-progress] 10 NA NA"), null);
+  assert.equal(parseProgress("/tmp/yoink-abc/src.webm"), null);
+});
+
+test("buildPreviewArgs: audio-only mono mp3, 32 kHz 64k", () => {
   assert.deepEqual(buildPreviewArgs("/tmp/a.webm", "/tmp/p.mp3"), [
-    "-y", "-i", "/tmp/a.webm", "-ac", "1", "-c:a", "libmp3lame", "-b:a", "96k", "/tmp/p.mp3",
+    "-y", "-i", "/tmp/a.webm", "-vn", "-ac", "1", "-ar", "32000", "-c:a", "libmp3lame", "-b:a", "64k", "/tmp/p.mp3",
   ]);
 });
 

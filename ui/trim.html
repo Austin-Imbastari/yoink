@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="en">
+<html lang="en" data-skin="__SKIN__">
   <head>
     <meta charset="UTF-8" />
     <title>Yoink</title>
@@ -8,31 +8,149 @@
       rel="stylesheet"
     />
     <style>
+      /* ---- skins: every color below comes from these tokens (same set in paste.html) ---- */
+      :root {
+        /* Luna — Windows XP blue */
+        --chrome: #ece9d8;
+        --chrome-line: #aca899;
+        --panel: #ffffff;
+        --field: #ffffff;
+        --screen: #ffffff;
+        --title: linear-gradient(180deg, #4a93f8 0%, #2566db 50%, #0f3fb5 100%);
+        --title-ink: #ffffff;
+        --ink: #1a3a6e;
+        --ink-2: #3a5a8c;
+        --ink-soft: #4a6fa5;
+        --ink-faint: #5a7fc4;
+        --caption: #6f86b0;
+        --quiet-ink: #333333;
+        --field-ink: #103a8e;
+        --accent: #1648c4;
+        --accent-ink: #ffffff;
+        --btn: linear-gradient(180deg, #4a93f8, #1648c4);
+        --btn-shadow: rgba(20, 60, 160, 0.5);
+        --btn-active: #4a93f8;
+        --play: linear-gradient(180deg, #86d94e, #3e9c20);
+        --marker: #15c4ba;
+        --region: rgba(23, 196, 186, 0.13);
+        --playhead: #0a2a6a;
+        --wave: #5aa0f5;
+        --grid: 22, 72, 196; /* rgb of the beat lines */
+        --err-bg: #e7f0ff;
+        --err-line: #7da2e0;
+        --err-ink: #1a3f8a;
+        --menu-hi: #316ac5;
+        --dialog-line: #0f3fb5;
+        --dialog-shadow: rgba(20, 60, 160, 0.4);
+        --backdrop: rgba(15, 63, 181, 0.25);
+      }
+      html[data-skin="dolphin"] {
+        /* Dolphin — pink dolphin title bar, sky-blue buttons + waveform, lavender CRT screen */
+        --chrome: #efe6fb;
+        --chrome-line: #c3a9e3;
+        --panel: #fffaff;
+        --field: #ffffff;
+        --screen: #f3ebff;
+        --title: linear-gradient(180deg, #ffa6e3 0%, #e263c0 50%, #b43b98 100%);
+        --title-ink: #ffffff;
+        --ink: #4b2a73;
+        --ink-2: #6a4596;
+        --ink-soft: #7652a3;
+        --ink-faint: #9270bf;
+        --caption: #9a82bd;
+        --quiet-ink: #4b2a73;
+        --field-ink: #2a5bb8;
+        --accent: #2a78cf;
+        --accent-ink: #ffffff;
+        --btn: linear-gradient(180deg, #8fd3ff 0%, #3b8fe0 55%, #2a6fc4 100%);
+        --btn-shadow: rgba(180, 59, 152, 0.45);
+        --btn-active: #e263c0;
+        --play: linear-gradient(180deg, #ffa6e3, #d24aa9);
+        --marker: #ff4fb8;
+        --region: rgba(255, 79, 184, 0.09);
+        --playhead: #2a3f8f;
+        --wave: #58aef0;
+        --grid: 150, 70, 190;
+        --err-bg: #fde8f6;
+        --err-line: #e79bd0;
+        --err-ink: #8a2a6e;
+        --menu-hi: #e263c0;
+        --dialog-line: #b43b98;
+        --dialog-shadow: rgba(59, 143, 224, 0.45);
+        --backdrop: rgba(180, 59, 152, 0.22);
+      }
+      html[data-skin="plumbob"] {
+        /* Plumbob — XP Media Player lime: glossy green chrome, mint screen, lilac markers */
+        --chrome: #e6f2dc;
+        --chrome-line: #9cc584;
+        --panel: #ffffff;
+        --field: #ffffff;
+        --screen: #eefae4;
+        --title: linear-gradient(180deg, #a6ea74 0%, #5cb82e 50%, #3a8a1c 100%);
+        --title-ink: #ffffff;
+        --ink: #1f4a12;
+        --ink-2: #35661f;
+        --ink-soft: #4d7a36;
+        --ink-faint: #5f8f45;
+        --caption: #6f9a58;
+        --quiet-ink: #1f4a12;
+        --field-ink: #2d6a12;
+        --accent: #2f7f17;
+        --accent-ink: #ffffff;
+        --btn: linear-gradient(180deg, #b6f07a 0%, #5cc02c 55%, #3b8f18 100%);
+        --btn-shadow: rgba(40, 90, 20, 0.45);
+        --btn-active: #6fcf3a;
+        --play: linear-gradient(180deg, #c6ee4a, #5fae1b);
+        --marker: #9b6cf0;
+        --region: rgba(155, 108, 240, 0.1);
+        --playhead: #1f4a12;
+        --wave: #58b83a;
+        --grid: 40, 110, 25;
+        --err-bg: #effbe6;
+        --err-line: #9fd37f;
+        --err-ink: #2e6a14;
+        --menu-hi: #5cb42f;
+        --dialog-line: #3a8a1c;
+        --dialog-shadow: rgba(58, 138, 28, 0.4);
+        --backdrop: rgba(58, 138, 28, 0.22);
+      }
+      html[data-skin="dolphin"] .tbar > span:first-child::after {
+        content: " 🐬";
+      }
+      html[data-skin="plumbob"] .tbar > span:first-child::after {
+        content: " 💚";
+      }
+
       html,
       body {
         margin: 0;
       }
       body {
         font-family: "Pixelify Sans", Tahoma, sans-serif;
-        background: #ece9d8;
+        background: var(--chrome);
+      }
+      input[type="checkbox"] {
+        accent-color: var(--accent);
+        width: 15px;
+        height: 15px;
       }
       .tbar {
-        background: linear-gradient(180deg, #4a93f8 0%, #2566db 50%, #0f3fb5 100%);
-        color: #ffffff;
-        font-size: 13px;
-        padding: 6px 9px;
+        background: var(--title);
+        color: var(--title-ink);
+        font-size: 15px;
+        padding: 7px 11px;
         display: flex;
         justify-content: space-between;
       }
       .mbar {
-        background: #ece9d8;
-        font-size: 13px;
-        padding: 3px 9px;
-        color: #1a3a6e;
+        background: var(--chrome);
+        font-size: 15px;
+        padding: 4px 11px;
+        color: var(--ink);
         display: flex;
-        gap: 14px;
+        gap: 16px;
         align-items: center;
-        border-bottom: 1px solid #aca899;
+        border-bottom: 1px solid var(--chrome-line);
       }
       .mbar u {
         text-decoration: underline;
@@ -40,40 +158,41 @@
       .sig {
         margin-left: auto;
         font-family: "VT323", monospace;
-        color: #5a7fc4;
+        font-size: 17px;
+        color: var(--ink-faint);
       }
       .body {
-        background: #ffffff;
-        padding: 11px 12px 8px;
+        background: var(--panel);
+        padding: 13px 14px 10px;
       }
       .canvas-wrap {
         position: relative;
-        margin: 9px 0 6px;
-        background: #fff;
-        border: 2px inset #aca899;
+        margin: 10px 0 7px;
+        background: var(--screen);
+        border: 2px inset var(--chrome-line);
         border-radius: 3px;
-        height: 110px;
+        height: 128px;
         overflow: hidden;
         touch-action: none;
       }
       #wave {
         width: 100%;
-        height: 110px;
+        height: 128px;
         display: block;
       }
       .region {
         position: absolute;
         top: 0;
         bottom: 0;
-        background: rgba(23, 196, 186, 0.13);
+        background: var(--region);
       }
-      /* Thin teal loop markers with a flag at the top (Ableton-style). The element itself is a
+      /* Thin loop markers with a flag at the top (Ableton-style). The element itself is a
          wider transparent grab zone so the thin line stays easy to grab. */
       .handle {
         position: absolute;
         top: 0;
         bottom: 0;
-        width: 16px;
+        width: 18px;
         background: transparent;
         cursor: ew-resize;
       }
@@ -83,104 +202,104 @@
         top: 0;
         bottom: 0;
         width: 2px;
-        background: #15c4ba;
+        background: var(--marker);
       }
       .handle::before {
         content: "";
         position: absolute;
         top: 0;
-        border-top: 8px solid #15c4ba;
-        border-left: 6px solid transparent;
-        border-right: 6px solid transparent;
+        border-top: 9px solid var(--marker);
+        border-left: 7px solid transparent;
+        border-right: 7px solid transparent;
       }
       .handle.l {
-        left: -8px;
+        left: -9px;
       }
       .handle.l::after {
-        left: 7px;
+        left: 8px;
       }
       .handle.l::before {
-        left: 1px;
+        left: 2px;
       }
       .handle.r {
-        right: -8px;
+        right: -9px;
       }
       .handle.r::after {
-        right: 7px;
+        right: 8px;
       }
       .handle.r::before {
-        right: 1px;
+        right: 2px;
       }
       .playhead {
         position: absolute;
         top: 0;
         bottom: 0;
         width: 2px;
-        background: #0a2a6a;
+        background: var(--playhead);
         display: none;
       }
       .zoomhint {
         font-family: "VT323", monospace;
-        font-size: 11px;
-        color: #5a7fc4;
+        font-size: 13px;
+        color: var(--ink-faint);
         text-align: center;
-        margin: 0 0 6px;
+        margin: 0 0 7px;
       }
       .meta {
         font-family: "VT323", monospace;
-        font-size: 14px;
-        color: #3a5a8c;
+        font-size: 16px;
+        color: var(--ink-2);
         display: flex;
         justify-content: space-between;
-        margin: 0 2px 7px;
+        margin: 0 2px 8px;
       }
       .metaleft {
         display: flex;
         align-items: center;
-        gap: 7px;
+        gap: 8px;
         min-width: 0;
       }
       .plat {
         flex: none;
-        background: #1648c4;
-        color: #fff;
-        font-size: 11px;
+        background: var(--accent);
+        color: var(--accent-ink);
+        font-size: 13px;
         line-height: 1.4;
-        padding: 1px 7px;
+        padding: 1px 8px;
         border-radius: 3px;
         white-space: nowrap;
       }
       .beatrow {
         display: flex;
         align-items: center;
-        gap: 10px;
-        margin-bottom: 9px;
-        font-size: 13px;
-        color: #1a3a6e;
+        gap: 12px;
+        margin-bottom: 10px;
+        font-size: 15px;
+        color: var(--ink);
       }
       .bpmread {
         font-weight: bold;
-        min-width: 60px;
+        min-width: 68px;
       }
       .tapbtn {
-        background: #ece9d8;
-        border: 1px solid #aca899;
+        background: var(--chrome);
+        border: 1px solid var(--chrome-line);
         border-radius: 4px;
-        padding: 2px 12px;
+        padding: 3px 14px;
         font-family: inherit;
-        font-size: 12px;
-        color: #333;
+        font-size: 14px;
+        color: var(--quiet-ink);
         cursor: pointer;
       }
       .tapbtn:active {
-        background: #4a93f8;
+        background: var(--btn-active);
         color: #fff;
       }
       .keypill {
-        background: #1648c4;
-        color: #fff;
-        font-size: 11px;
-        padding: 1px 8px;
+        background: var(--accent);
+        color: var(--accent-ink);
+        font-size: 13px;
+        padding: 1px 9px;
         border-radius: 3px;
       }
       .keypill:empty {
@@ -190,10 +309,10 @@
         margin-left: auto;
         display: flex;
         align-items: center;
-        gap: 4px;
+        gap: 5px;
         cursor: pointer;
         user-select: none;
-        font-size: 12px;
+        font-size: 14px;
       }
       .snaplbl input {
         margin: 0;
@@ -202,71 +321,72 @@
       .ctrls {
         display: flex;
         align-items: center;
-        gap: 8px;
-        margin-bottom: 9px;
+        gap: 9px;
+        margin-bottom: 10px;
       }
       .play {
-        width: 30px;
-        height: 26px;
-        background: linear-gradient(180deg, #86d94e, #3e9c20);
+        width: 35px;
+        height: 30px;
+        font-size: 15px;
+        background: var(--play);
         color: #fff;
         border: 1px solid #fff;
-        border-radius: 5px;
+        border-radius: 6px;
         cursor: pointer;
       }
       .tg {
         display: flex;
         align-items: center;
-        gap: 4px;
-        font-size: 12px;
-        color: #1a3a6e;
+        gap: 5px;
+        font-size: 14px;
+        color: var(--ink);
       }
       .tin {
-        width: 58px;
-        background: #fff;
-        border: 2px inset #aca899;
+        width: 66px;
+        background: var(--field);
+        border: 2px inset var(--chrome-line);
         border-radius: 3px;
-        height: 24px;
+        height: 28px;
         font-family: "VT323", monospace;
-        font-size: 15px;
+        font-size: 17px;
         text-align: center;
-        color: #103a8e;
+        color: var(--field-ink);
       }
       .dur {
-        font-size: 12px;
-        color: #4a6fa5;
+        font-size: 14px;
+        color: var(--ink-soft);
         margin-left: auto;
       }
       .opts {
         display: grid;
         grid-template-columns: auto 1fr;
-        gap: 6px 8px;
-        font-size: 12px;
-        color: #1a3a6e;
+        gap: 7px 9px;
+        font-size: 14px;
+        color: var(--ink);
         align-items: center;
-        margin-bottom: 10px;
+        margin-bottom: 12px;
       }
       .opt-in,
       select {
-        background: #fff;
-        border: 2px inset #aca899;
+        background: var(--field);
+        border: 2px inset var(--chrome-line);
         border-radius: 3px;
-        height: 24px;
+        height: 28px;
         font-family: "VT323", monospace;
-        font-size: 14px;
-        color: #103a8e;
-        padding: 0 6px;
+        font-size: 16px;
+        color: var(--field-ink);
+        padding: 0 7px;
         box-sizing: border-box;
         width: 100%;
       }
       .chk-row {
         display: flex;
-        gap: 16px;
+        gap: 18px;
       }
       .chk {
         display: flex;
         align-items: center;
-        gap: 5px;
+        gap: 6px;
         cursor: pointer;
         user-select: none;
       }
@@ -278,33 +398,162 @@
         display: flex;
         align-items: center;
         justify-content: space-between;
-        background: #ece9d8;
-        padding: 8px 10px;
-        border-top: 1px solid #aca899;
+        background: var(--chrome);
+        padding: 9px 12px;
+        border-top: 1px solid var(--chrome-line);
       }
       .fsig {
         font-family: "VT323", monospace;
-        font-size: 11px;
-        color: #5a7fc4;
+        font-size: 13px;
+        color: var(--ink-faint);
       }
       .drop {
-        background: linear-gradient(180deg, #4a93f8, #1648c4);
+        background: var(--btn);
         color: #fff;
         border: 1px solid #fff;
-        border-radius: 6px;
-        font-size: 14px;
-        padding: 7px 16px;
-        box-shadow: 2px 2px 0 rgba(20, 60, 160, 0.5);
+        border-radius: 7px;
+        font-size: 16px;
+        padding: 8px 19px;
+        box-shadow: 2px 2px 0 var(--btn-shadow);
         cursor: pointer;
         font-family: inherit;
+      }
+
+      /* ---- Skin menu ---- */
+      .menuwrap {
+        position: relative;
+      }
+      .menuitem,
+      .helpbtn {
+        cursor: pointer;
+      }
+      .menuitem {
+        padding: 0 3px;
+        margin: 0 -3px;
+        border-radius: 2px;
+      }
+      .menuitem[aria-expanded="true"] {
+        background: var(--menu-hi);
+        color: #fff;
+      }
+      .menu {
+        position: absolute;
+        top: calc(100% + 5px);
+        left: -5px;
+        z-index: 10;
+        min-width: 172px;
+        padding: 4px;
+        background: var(--field);
+        border: 1px solid var(--chrome-line);
+        box-shadow: 2px 2px 0 var(--dialog-shadow);
+      }
+      .menu button {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        width: 100%;
+        padding: 5px 9px;
+        border: 0;
+        border-radius: 2px;
+        background: none;
+        box-shadow: none;
+        font: inherit;
+        font-size: 15px;
+        color: var(--ink);
+        text-align: left;
+        cursor: pointer;
+      }
+      .menu button:hover,
+      .menu button:focus-visible {
+        background: var(--menu-hi);
+        color: #fff;
+        outline: none;
+      }
+      .tick {
+        width: 12px;
+        visibility: hidden;
+      }
+      .menu button[aria-checked="true"] .tick {
+        visibility: visible;
+      }
+      .swatch {
+        margin-left: auto;
+        width: 18px;
+        height: 13px;
+        border: 1px solid rgba(0, 0, 0, 0.3);
+        border-radius: 2px;
+      }
+      .swatch.luna {
+        background: linear-gradient(135deg, #2566db 50%, #ece9d8 50%);
+      }
+      .swatch.dolphin {
+        background: linear-gradient(135deg, #e263c0 50%, #58aef0 50%);
+      }
+      .swatch.plumbob {
+        background: linear-gradient(135deg, #5cb82e 50%, #9b6cf0 50%);
+      }
+
+      /* ---- Help dialog ---- */
+      #help {
+        border: 1px solid var(--dialog-line);
+        border-radius: 6px;
+        padding: 0;
+        width: min(380px, calc(100vw - 24px));
+        max-height: calc(100vh - 24px);
+        overflow: auto;
+        background: var(--panel);
+        color: var(--ink);
+        font-family: inherit;
+        box-shadow: 3px 3px 0 var(--dialog-shadow);
+      }
+      #help::backdrop {
+        background: var(--backdrop);
+      }
+      .helpx {
+        background: none;
+        border: 0;
+        color: var(--title-ink);
+        font: inherit;
+        padding: 0 4px;
+        cursor: pointer;
+      }
+      .helpbody {
+        padding: 12px 14px 14px;
+        font-size: 15px;
+        line-height: 1.45;
+      }
+      .helpbody p {
+        margin: 0 0 7px;
+      }
+      .helpbody ol {
+        margin: 0;
+        padding-left: 20px;
+      }
+      .helpsig {
+        margin-top: 12px;
+        text-align: right;
+        font-family: "VT323", monospace;
+        font-size: 18px;
+        color: var(--accent);
       }
     </style>
   </head>
   <body>
     <div class="tbar"><span>Yoink any links ♡</span><span>_ ▢ ✕</span></div>
     <div class="mbar">
-      <span><u>F</u>ile</span><span><u>E</u>dit</span><span><u>C</u>rate</span><span><u>H</u>elp</span
-      ><span class="sig">Developed by gudimbz ♡</span>
+      <span><u>F</u>ile</span>
+      <span><u>E</u>dit</span>
+      <span><u>C</u>rate</span>
+      <span class="menuwrap">
+        <span class="menuitem" id="skinBtn" aria-haspopup="menu" aria-expanded="false"><u>S</u>kin</span>
+        <div class="menu" id="skinMenu" role="menu" hidden>
+          <button role="menuitemradio" data-skin="luna"><span class="tick">✓</span>Luna<span class="swatch luna"></span></button>
+          <button role="menuitemradio" data-skin="dolphin"><span class="tick">✓</span>Dolphin<span class="swatch dolphin"></span></button>
+          <button role="menuitemradio" data-skin="plumbob"><span class="tick">✓</span>Plumbob<span class="swatch plumbob"></span></button>
+        </div>
+      </span>
+      <span class="helpbtn" id="helpBtn"><u>H</u>elp</span>
+      <span class="sig">Developed by gudimbz ♡</span>
     </div>
     <div class="body">
       <div class="canvas-wrap" id="wrap">
@@ -336,6 +585,11 @@
           <option value="selected">selected track</option>
           <option value="new">new track</option>
         </select>
+        <span>sample rate</span>
+        <select id="sr">
+          <option value="48000">48 kHz</option>
+          <option value="44100">44.1 kHz</option>
+        </select>
         <span>options</span>
         <div class="chk-row">
           <label class="chk"><input type="checkbox" id="warp" /> ⊕ warp</label>
@@ -348,6 +602,23 @@
       <button class="drop" id="dropBtn">drop into set</button>
     </div>
 
+    <dialog id="help">
+      <div class="tbar"><span>About Yoink ♡</span><button class="helpx" id="helpClose" aria-label="Close help">✕</button></div>
+      <div class="helpbody">
+        <p>
+          Yoink grabs the audio from any link — YouTube, TikTok, Instagram, SoundCloud &amp; more — and drops it
+          straight into your Set as a WAV. No browser, no downloader, no file hunting.
+        </p>
+        <ol>
+          <li>paste a link</li>
+          <li>trim the bit you want — scroll to zoom, drag to pan, ▶ to loop it</li>
+          <li>check the BPM &amp; key (tap to fix the tempo)</li>
+          <li>pick warp / loop, then drop into set ♪</li>
+        </ol>
+        <div class="helpsig">happy yoinking ♡ by imba</div>
+      </div>
+    </dialog>
+
     <audio id="audio" src="__AUDIO_SRC__"></audio>
     <script>
       const DURATION = Number("__DURATION__") || 0; // full video length in seconds
@@ -357,6 +628,19 @@
       let bpm = Number("__BPM__") || 0;
       let phase = Number("__PHASE__") || 0; // seconds from sample start to the first beat
       const detectedKey = "__KEY__";
+      // Waveform peaks computed host-side: one byte (max |amplitude| 0–255) per 1/PEAK_RATE s.
+      // Decoding the whole track here instead would hold the full PCM in memory.
+      const PEAK_RATE = Number("__PEAK_RATE__") || 0;
+      const peaks = (() => {
+        try {
+          const bin = atob("__PEAKS__");
+          const out = new Uint8Array(bin.length);
+          for (let i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i);
+          return out;
+        } catch (e) {
+          return new Uint8Array(0); // waveform is best-effort; trimming by fields still works
+        }
+      })();
 
       const wrap = document.getElementById("wrap");
       const canvas = document.getElementById("wave");
@@ -379,8 +663,9 @@
       // ---- view window (zoom / pan) ----
       let viewStart = 0,
         viewEnd = DURATION || 1;
-      let audioBuffer = null;
-      const MIN_SPAN = 0.05; // seconds — the deepest zoom level
+      const MIN_SEL = 0.05; // seconds — the shortest selection
+      // Deepest zoom keeps ≥40 peaks on screen; past the peak resolution there's nothing new to see.
+      const MIN_SPAN = PEAK_RATE > 0 ? Math.max(0.05, 40 / PEAK_RATE) : 0.05;
       const span = () => viewEnd - viewStart;
       const timeToX = (t) => ((t - viewStart) / span()) * wrap.clientWidth;
       const xToTime = (x) => viewStart + (x / wrap.clientWidth) * span();
@@ -401,38 +686,36 @@
       }
 
       // ---- waveform ----
-      function computePeaks(buffer, fromSec, toSec, cols) {
-        const data = buffer.getChannelData(0);
-        const sr = buffer.sampleRate;
-        const a = Math.max(0, Math.floor(fromSec * sr));
-        const b = Math.min(data.length, Math.ceil(toSec * sr));
-        const block = Math.max(1, Math.floor((b - a) / cols));
-        const peaks = [];
+      // Canvas can't use CSS variables directly, so read the current skin's colors at draw time.
+      const skinColor = (name) => getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+      // Loudest peak per canvas column over the current view (0–1).
+      function viewPeaks(cols) {
+        const out = new Float32Array(cols);
+        const per = (span() * PEAK_RATE) / cols; // peaks per column (<1 when zoomed in)
+        const base = viewStart * PEAK_RATE;
         for (let i = 0; i < cols; i++) {
+          const a = Math.floor(base + i * per);
+          const b = Math.max(a + 1, Math.floor(base + (i + 1) * per));
           let max = 0;
-          const start = a + i * block;
-          for (let j = 0; j < block; j++) {
-            const v = Math.abs(data[start + j] || 0);
-            if (v > max) max = v;
-          }
-          peaks.push(max);
+          for (let j = a; j < b && j < peaks.length; j++) if (peaks[j] > max) max = peaks[j];
+          out[i] = max / 255;
         }
-        return peaks;
+        return out;
       }
       function drawWave() {
         const w = wrap.clientWidth,
-          h = 110;
+          h = wrap.clientHeight; // sized by CSS (.canvas-wrap)
         canvas.width = w;
         canvas.height = h;
         const ctx = canvas.getContext("2d");
         ctx.clearRect(0, 0, w, h);
-        if (!audioBuffer) return;
+        if (!peaks.length || PEAK_RATE <= 0) return;
         const cols = Math.max(60, w);
-        const peaks = computePeaks(audioBuffer, viewStart, viewEnd, cols);
-        ctx.fillStyle = "#5aa0f5";
+        const colPeaks = viewPeaks(cols);
+        ctx.fillStyle = skinColor("--wave");
         const bw = w / cols;
         for (let i = 0; i < cols; i++) {
-          const bh = Math.max(2, peaks[i] * h);
+          const bh = Math.max(2, colPeaks[i] * h);
           ctx.fillRect(i * bw, (h - bh) / 2, Math.max(1, bw - 1), bh);
         }
         drawGrid(ctx, w, h);
@@ -448,12 +731,13 @@
         const drawBeats = beatPx >= MIN_PX;
         const drawBars = beatPx * 4 >= MIN_PX;
         if (!drawBeats && !drawBars) return;
+        const grid = skinColor("--grid");
         let n = Math.ceil((viewStart - phase) / beatSec);
         for (let t = phase + n * beatSec; t <= viewEnd; t += beatSec, n++) {
           const isBar = ((n % 4) + 4) % 4 === 0;
           if (isBar ? !drawBars : !drawBeats) continue;
           const x = Math.round(timeToX(t)) + 0.5;
-          ctx.strokeStyle = isBar ? "rgba(22,72,196,0.55)" : "rgba(22,72,196,0.2)";
+          ctx.strokeStyle = isBar ? `rgba(${grid},0.55)` : `rgba(${grid},0.2)`;
           ctx.lineWidth = isBar ? 1.5 : 1;
           ctx.beginPath();
           ctx.moveTo(x, 0);
@@ -483,7 +767,9 @@
       function commitFields() {
         const s = parseClock(startIn.value),
           e = parseClock(endIn.value);
-        if (s !== null) startSec = Math.min(Math.max(0, s), DURATION);
+        // Start stops short of the end of the track so the selection can never be empty
+        // (an empty selection would export nothing).
+        if (s !== null) startSec = Math.min(Math.max(0, s), Math.max(0, DURATION - MIN_SEL));
         if (e !== null) endSec = Math.min(Math.max(startSec, e), DURATION);
         if (endSec <= startSec) endSec = Math.min(DURATION, startSec + 1);
         renderRegion();
@@ -514,8 +800,8 @@
         if (drag) {
           let t = Math.min(DURATION, Math.max(0, xToTime(e.clientX - rect.left)));
           if (!e.altKey) t = snapTime(t); // hold Alt while dragging to bypass snapping
-          if (drag === "l") startSec = Math.min(t, endSec - MIN_SPAN);
-          else endSec = Math.max(t, startSec + MIN_SPAN);
+          if (drag === "l") startSec = Math.min(t, endSec - MIN_SEL);
+          else endSec = Math.max(t, startSec + MIN_SEL);
           renderRegion();
           return;
         }
@@ -568,6 +854,7 @@
       // ---- preview ----
       const play = document.getElementById("play");
       let playing = false;
+      let raf = 0;
       play.addEventListener("click", () => {
         if (playing) {
           audio.pause();
@@ -577,6 +864,8 @@
         audio.play();
         playing = true;
         play.textContent = "❚❚";
+        cancelAnimationFrame(raf);
+        raf = requestAnimationFrame(tick);
       });
       audio.addEventListener("pause", () => {
         playing = false;
@@ -593,13 +882,14 @@
           playhead.style.left = x + "px";
         }
       }
-      audio.addEventListener("timeupdate", () => {
-        // Loop the selected region so the user can audition the part on repeat.
-        if (audio.currentTime >= endSec) {
-          audio.currentTime = startSec;
-        }
+      // Every frame (`timeupdate` only fires ~4×/s): loop the selected region tightly so the
+      // user can audition it on repeat, and move the playhead smoothly.
+      function tick() {
+        if (!playing) return;
+        if (audio.currentTime >= endSec) audio.currentTime = startSec;
         positionPlayhead();
-      });
+        raf = requestAnimationFrame(tick);
+      }
 
       // ---- result ----
       function drop() {
@@ -617,6 +907,7 @@
             sampleRate: srEl ? Number(srEl.value) : 48000,
             warp: warpEl.checked,
             loop: loopEl.checked,
+            skin, // so the host remembers a skin picked here
           };
           const message = { method: "close_and_send", params: [JSON.stringify(result)] };
           if (window.webkit?.messageHandlers?.live) window.webkit.messageHandlers.live.postMessage(message);
@@ -670,25 +961,60 @@
         }
       });
 
+      // ---- skin menu ----
+      const SKINS = ["luna", "dolphin", "plumbob"];
+      let skin = SKINS.includes("__SKIN__") ? "__SKIN__" : "luna";
+      const skinBtn = document.getElementById("skinBtn");
+      const skinMenu = document.getElementById("skinMenu");
+      function applySkin(name) {
+        skin = name;
+        document.documentElement.dataset.skin = name;
+        skinMenu
+          .querySelectorAll("[data-skin]")
+          .forEach((item) => item.setAttribute("aria-checked", String(item.dataset.skin === name)));
+      }
+      function openSkinMenu(open) {
+        skinMenu.hidden = !open;
+        skinBtn.setAttribute("aria-expanded", String(open));
+      }
+      skinBtn.addEventListener("click", (e) => {
+        e.stopPropagation(); // the document listener below would close it again
+        openSkinMenu(skinMenu.hidden);
+      });
+      skinMenu.addEventListener("click", (e) => {
+        const item = e.target.closest("[data-skin]");
+        if (!item) return;
+        applySkin(item.dataset.skin);
+        drawWave(); // the canvas doesn't pick up CSS changes on its own
+      });
+      document.addEventListener("click", () => openSkinMenu(false));
+      document.addEventListener("keydown", (e) => {
+        if (e.key === "Escape") openSkinMenu(false);
+      });
+
+      // ---- help ----
+      const help = document.getElementById("help");
+      document.getElementById("helpBtn").addEventListener("click", () => help.showModal());
+      document.getElementById("helpClose").addEventListener("click", () => help.close());
+      help.addEventListener("click", (e) => {
+        if (e.target === help) help.close(); // click on the backdrop
+      });
+
       // ---- init ----
+      applySkin(skin);
       document.getElementById("totaldur").textContent = clock(DURATION);
       updateBpmReadout();
       keyPillEl.textContent = detectedKey || "";
       // Hide the source badge when yt-dlp didn't give us a recognizable platform name.
       const platEl = document.getElementById("plat");
       if (platEl && !platEl.textContent.trim()) platEl.style.display = "none";
-      (async () => {
-        try {
-          const resp = await fetch(audio.src);
-          const arr = await resp.arrayBuffer();
-          const ctx = new (window.AudioContext || window.webkitAudioContext)();
-          audioBuffer = await ctx.decodeAudioData(arr);
-        } catch (e) {
-          // Waveform is best-effort; trimming by fields still works without it.
-        }
+      // Live's dialog lays the page out after this script runs (wrap is 0px wide here), so draw
+      // whenever the waveform box gets its real size — including the first layout.
+      new ResizeObserver(() => {
         drawWave();
         renderRegion();
-      })();
+        positionPlayhead();
+      }).observe(wrap);
     </script>
   </body>
 </html>
